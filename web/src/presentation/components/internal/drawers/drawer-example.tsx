@@ -14,7 +14,7 @@ const SocialMediaSchema = z.object({
 type SocialMediaFormData = z.infer<typeof SocialMediaSchema>;
 
 export function DrawerExample({ closeModal }: { closeModal: () => void }) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, _setIsLoading] = useState(false);
 
   const {
     handleSubmit,
