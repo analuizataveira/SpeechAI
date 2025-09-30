@@ -2,12 +2,12 @@
 
 import type React from "react"
 
-import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/hooks/user-provider"
-import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Link, Loader2, Mic } from "lucide-react"
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@/presentation/components"
+import { ArrowLeft, Link, Loader2, Mic } from "lucide-react"
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -16,6 +16,12 @@ export default function LoginPage() {
   const { login } = useUser()
   const router = useNavigate()
   const { toast } = useToast()
+
+    // Funções para navegação
+  const goHome = () => router("/");
+  const goForgotPassword = () => router("/forgot-password");
+  const goRegister = () => router("/register");
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,10 +57,14 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Back to home */}
-        <Link href="/" className="inline-flex items-center text-muted-foreground hover:text-foreground mb-8">
-          <ArrowLeft className="w-4 h-4 mr-2" />
+        <button
+          type="button"
+          onClick={goHome}
+          className="inline-flex items-center text-muted-foreground hover:text-foreground mb-8"
+        >
+          <ArrowLeft className="w-5 h-5 mr-2" />
           Voltar ao início
-        </Link>
+        </button>
 
         <Card className="bg-card border-border">
           <CardHeader className="text-center">
@@ -102,9 +112,13 @@ export default function LoginPage() {
             </form>
 
             <div className="mt-4 text-center">
-              <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground">
+              <button
+                type="button"
+                onClick={goForgotPassword}
+                className="text-sm text-muted-foreground"
+              >
                 Esqueceu sua senha?
-              </Link>
+              </button>
             </div>
 
             <div className="relative mt-4">
@@ -118,9 +132,13 @@ export default function LoginPage() {
 
             <div className="mt-4 text-center">
               <span className="text-sm text-muted-foreground">Não tem uma conta? </span>
-              <Link href="/register" className="text-sm text-primary hover:underline">
+              <button
+                type="button"
+                onClick={goRegister}
+                className="text-sm text-primary hover:underline"
+              >
                 Cadastre-se
-              </Link>
+              </button>
             </div>
           </CardContent>
         </Card>

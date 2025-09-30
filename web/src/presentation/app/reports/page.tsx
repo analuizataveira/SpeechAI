@@ -3,16 +3,21 @@ import { Progress } from "@/presentation/components/ui/progress"
 import { FileText, Download, Calendar, TrendingUp, ArrowLeft, Filter, Share2, Eye } from "lucide-react"
 import { Button } from "@/presentation/components"
 import { Badge } from "@/presentation/components/ui/badge"
+import { useNavigate } from "react-router-dom"
 
 export default function ReportsPage() {
+
+    const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-background">
+      
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Voltar
               </Button>

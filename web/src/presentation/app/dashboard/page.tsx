@@ -2,7 +2,7 @@
 
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/hooks/user-provider"
-import { Button, Calendar, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/presentation/components"
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/presentation/components"
 import LogoutIcon from "@/presentation/components/icons/logout-icon"
 import Settings from "@/presentation/components/icons/settings"
 import { Badge } from "@/presentation/components/ui/badge"
@@ -78,7 +78,6 @@ export default function DashboardPage() {
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Sessões Completas</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{user.sessionsCompleted}</div>
