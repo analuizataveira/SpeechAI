@@ -2,9 +2,7 @@
 
 import * as React from 'react'
 import { cn } from '@/utils/cn'
-// @ts-ignore
 import * as ProgressPrimitive from '@radix-ui/react-progress'
-
 
 const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,

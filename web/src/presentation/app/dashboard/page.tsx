@@ -1,24 +1,25 @@
 "use client"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { Mic, TrendingUp, Calendar, Award, Play, FileText, Settings, LogOut, Brain } from "lucide-react"
-import { useUser } from "@/contexts/user-context"
 import { useToast } from "@/hooks/use-toast"
+import { useUser } from "@/hooks/user-provider"
+import { Button, Calendar, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/presentation/components"
+import LogoutIcon from "@/presentation/components/icons/logout-icon"
+import Settings from "@/presentation/components/icons/settings"
+import { Badge } from "@/presentation/components/ui/badge"
+import { Progress } from "@/presentation/components/ui/progress"
+import { Award, Brain, FileText, Mic, Play, TrendingUp } from "lucide-react"
+import { useEffect } from "react"
+import { Link, useNavigate } from "react-router-dom"
+
 
 export default function DashboardPage() {
   const { user, isAuthenticated, logout } = useUser()
-  const router = useRouter()
   const { toast } = useToast()
+  const router = useNavigate()
 
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push("/login")
+      router("/login")
     }
   }, [isAuthenticated, router])
 
@@ -28,11 +29,11 @@ export default function DashboardPage() {
       title: "Logout realizado",
       description: "Até logo! Volte sempre para continuar seus exercícios.",
     })
-    router.push("/")
+    router("/")
   }
 
   const handleStartExercise = () => {
-    router.push("/exercise")
+    router("/exercise")
   }
 
   if (!user) {
@@ -45,19 +46,19 @@ export default function DashboardPage() {
       <header className="border-b border-border bg-card/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2">
+            <Link to="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <Mic className="w-5 h-5 text-primary-foreground" />
               </div>
               <span className="text-xl font-bold">SpeechAI</span>
             </Link>
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" onClick={() => router.push("/settings")}>
+              <Button variant="ghost" size="sm" onClick={() => router("/settings")}>
                 <Settings className="w-4 h-4 mr-2" />
                 Configurações
               </Button>
               <Button variant="ghost" size="sm" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-2" />
+                <LogoutIcon className="w-4 h-4 mr-2" />
                 Sair
               </Button>
             </div>
@@ -242,7 +243,7 @@ export default function DashboardPage() {
                 <Button
                   variant="outline"
                   className="w-full justify-start bg-transparent"
-                  onClick={() => router.push("/reports")}
+                  onClick={() => router("/reports")}
                 >
                   <FileText className="w-4 h-4 mr-2" />
                   Gerar Relatório
@@ -250,7 +251,7 @@ export default function DashboardPage() {
                 <Button
                   variant="outline"
                   className="w-full justify-start bg-transparent"
-                  onClick={() => router.push("/history")}
+                  onClick={() => router("/history")}
                 >
                   <TrendingUp className="w-4 h-4 mr-2" />
                   Ver Histórico
@@ -258,7 +259,7 @@ export default function DashboardPage() {
                 <Button
                   variant="outline"
                   className="w-full justify-start bg-transparent"
-                  onClick={() => router.push("/settings")}
+                  onClick={() => router("/settings")}
                 >
                   <Settings className="w-4 h-4 mr-2" />
                   Configurar Perfil
