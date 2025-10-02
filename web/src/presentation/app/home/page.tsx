@@ -27,13 +27,8 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
       <section className="relative py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-8">
-            <Brain className="w-4 h-4 mr-2" />
-            Powered by AI • Whisper + Phonemizer
-          </div>
 
           <h1 className="text-4xl md:text-6xl font-bold text-balance mb-6">
             Análise de Pronúncia
@@ -47,20 +42,15 @@ export default function HomePage() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/register">
-              <Button size="lg" className="w-full sm:w-auto">
+              <Button size="lg" 
+              className="w-full sm:w-auto">
                 Começar Agora
-              </Button>
-            </Link>
-            <Link to="/demo">
-              <Button variant="outline" size="lg" className="w-full sm:w-auto bg-transparent">
-                Ver Demo
               </Button>
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Features Grid */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -124,7 +114,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="border-t border-border bg-card/50 py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
