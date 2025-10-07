@@ -5,7 +5,7 @@ import type React from "react"
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/hooks/user-provider"
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@/presentation/components"
-import { ArrowLeft, Link, Loader2, Mic } from "lucide-react"
+import { ArrowLeft, Loader2, Mic } from "lucide-react"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 
