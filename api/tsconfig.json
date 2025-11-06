@@ -1,0 +1,48 @@
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "es2021",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./src",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "strictPropertyInitialization": false,
+    "strictNullChecks": false,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": false,
+    "noFallthroughCasesInSwitch": false,
+    "paths": {
+      "@src/*": ["./*"],
+      "@test/*": ["../test/*"],
+      // Providers
+      "@providers/*": ["./providers/*"],
+      "@auth/*": ["./providers/auth/*"],
+      "@database/*": ["./providers/database/*"],
+      "@logger/*": ["./providers/logger/*"],
+      "@mail/*": ["./providers/mail/*"],
+      "@bucket/*": ["./providers/bucket/*"],
+      "@integrations/*": ["./providers/integrations/*"],
+      "@firebase/*": ["./providers/firebase/*"],
+      // Resources
+      "@common/": ["./common/"],
+      "@common/*": ["./common/*"],
+      "@config/": ["./config/"],
+      "@config/*": ["./config/*"],
+      "@framework/": ["./framework/"],
+      "@framework/*": ["./framework/*"],
+      "@resources/": ["./resources/"],
+      "@resources/*": ["./resources/*"],
+      "@bff/": ["./bff/"],
+      "@bff/*": ["./bff/*"]
+    }
+  },
+  "exclude": ["node_modules", "./coverage/**/*", "./dist/**/*"]
+}

@@ -1,0 +1,178 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  DOCTOR
+  PATIENT
+}
+
+model User {
+  id           String    @id @default(uuid()) @unique
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         UserRole
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  doctorProfile  DoctorProfile?
+  patientProfile PatientProfile?
+
+  @@map("users")
+}
+
+model DoctorProfile {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id") @unique
+  name      String
+  birthDate DateTime @map("birth_date")
+  phone     String
+  specialty String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patientDoctors  UserDoctor[]
+  exerciseLists   ExerciseList[]
+
+  @@map("doctor_profile")
+}
+
+model PatientProfile {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id") @unique
+  name      String
+  birthDate DateTime @map("birth_date")
+  phone     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  doctors     UserDoctor[]
+  difficulties Difficulty[]
+  sessions    Session[]
+
+  @@map("patient_profile")
+}
+
+model UserDoctor {
+  id        String   @id @default(uuid())
+  doctorId  String   @map("doctor_id")
+  patientId String   @map("patient_id")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  doctor  DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, patientId])
+  @@map("user_doctor")
+}
+
+model DiffType {
+  id          String   @id @default(uuid())
+  description String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  difficulties Difficulty[]
+  exercises    Exercise[]
+  exerciseLists ExerciseList[]
+
+  @@map("diff_types")
+}
+
+model Difficulty {
+  id         String   @id @default(uuid())
+  patientId  String   @map("patient_id")
+  diffTypeId String   @map("diff_type_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  patient  PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  diffType DiffType       @relation(fields: [diffTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, diffTypeId])
+  @@map("difficulties")
+}
+
+model Exercise {
+  id         String   @id @default(uuid())
+  diffTypeId String   @map("diff_type_id")
+  text       String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  diffType        DiffType              @relation(fields: [diffTypeId], references: [id], onDelete: Cascade)
+  exerciseListItems ExerciseListItem[]
+
+  @@map("exercises")
+}
+
+model ExerciseList {
+  id              String   @id @default(uuid())
+  doctorId        String   @map("doctor_id")
+  diffTypeId      String   @map("diff_type_id")
+  title           String
+  difficultyLevel String   @map("difficulty_level")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  doctor    DoctorProfile      @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  diffType  DiffType           @relation(fields: [diffTypeId], references: [id], onDelete: Cascade)
+  items     ExerciseListItem[]
+  sessions  Session[]
+
+  @@map("exercises_lists")
+}
+
+model ExerciseListItem {
+  id              String   @id @default(uuid())
+  exerciseId      String   @map("exercise_id")
+  exerciseListId  String   @map("exercise_list_id")
+  order           Int?
+
+  // Relations
+  exercise     Exercise      @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  exerciseList ExerciseList  @relation(fields: [exerciseListId], references: [id], onDelete: Cascade)
+
+  @@unique([exerciseListId, exerciseId])
+  @@map("exercises_lists_items")
+}
+
+model Session {
+  id              String   @id @default(uuid())
+  patientId       String   @map("patient_id")
+  exerciseListId  String   @map("exercise_list_id")
+  score           Float?
+  correctItems    Int?
+  errorLog        String?  @map("error_log") @db.Text
+  startedAt       DateTime @map("started_at")
+  finishedAt      DateTime? @map("finished_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  patient      PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  exerciseList ExerciseList   @relation(fields: [exerciseListId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
