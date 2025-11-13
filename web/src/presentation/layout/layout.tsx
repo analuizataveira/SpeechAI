@@ -1,4 +1,4 @@
-import { UserProvider } from "@/hooks/user-provider"
+import React from "react"
 import { Suspense } from "react"
 import { Outlet } from "react-router-dom"
 
@@ -7,9 +7,7 @@ const AppLayout = () => {
     <div className="w-screen h-screen overflow-y-auto">
       <main className="w-full h-full">
         <Suspense fallback={<div>Loading...</div>}>
-          <UserProvider>
-            <Outlet />
-          </UserProvider>
+          <Outlet />
         </Suspense>
       </main>
     </div>

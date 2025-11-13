@@ -1,29 +1,30 @@
 "use client"
 
+import React from "react"
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/hooks/user-provider"
+import { useExerciseList } from "@/hooks/use-exercise-lists"
+import { SessionsRepository } from "@/data/repositories/sessions/repository"
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/presentation/components"
 import { Progress } from "@/presentation/components/ui/progress"
-import { ArrowLeft, Badge, Brain, Mic, MicOff, Pause, Play, RotateCcw, Volume2 } from "lucide-react"
-import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-
-const EXERCISE_WORDS = [
-  { word: "RATO", focus: "/r/", tip: "Foque na pronúncia do som /r/ no início da palavra" },
-  { word: "LATA", focus: "/l/", tip: "Mantenha a língua relaxada para o som /l/" },
-  { word: "CARRO", focus: "/r/", tip: "Pronuncie o /r/ duplo claramente" },
-  { word: "BOLA", focus: "/l/", tip: "O som /l/ deve ser suave e contínuo" },
-  { word: "TERRA", focus: "/r/", tip: "Vibre a língua para o som /r/" },
-]
+import { ArrowLeft, Badge, Brain, Mic, MicOff, Pause, Play, RotateCcw, Volume2, Loader2 } from "lucide-react"
+import { useState, useEffect, useMemo } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 
 export default function ExercisePage() {
   const [currentWordIndex, setCurrentWordIndex] = useState(0)
   const [isRecording, setIsRecording] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [sessionResults, setSessionResults] = useState<number[]>([])
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const { user, isAuthenticated } = useUser()
   const router = useNavigate()
   const { toast } = useToast()
+  const [searchParams] = useSearchParams()
+  const listId = searchParams.get('listId')
+  
+  const { exerciseList, loading: listLoading } = useExerciseList(listId)
+  const sessionsRepository = new SessionsRepository()
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -31,21 +32,70 @@ export default function ExercisePage() {
     }
   }, [isAuthenticated, router])
 
-  const currentWord = EXERCISE_WORDS[currentWordIndex]
-  const progress = ((currentWordIndex + 1) / EXERCISE_WORDS.length) * 100
+  // Initialize session when exercise list is loaded
+  useEffect(() => {
+    if (exerciseList && !currentSessionId) {
+      const createSession = async () => {
+        try {
+          const response = await sessionsRepository.create({
+            exerciseListId: exerciseList.id,
+            startedAt: new Date().toISOString(),
+          });
+          if (response.success) {
+            const session = response as any;
+            setCurrentSessionId(session.id);
+          }
+        } catch (error: any) {
+          toast({
+            title: "Erro ao iniciar sessão",
+            description: error?.message || "Não foi possível iniciar a sessão",
+            variant: "destructive",
+          });
+        }
+      };
+      createSession();
+    }
+  }, [exerciseList, currentSessionId]);
+
+  const exercises = useMemo(() => {
+    if (!exerciseList?.items) return [];
+    return exerciseList.items
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .map(item => ({
+        word: item.exercise?.text || '',
+        focus: exerciseList.diffType?.description || '',
+        tip: `Foque na pronúncia correta da palavra`,
+      }))
+      .filter(ex => ex.word);
+  }, [exerciseList]);
+
+  const currentWord = exercises[currentWordIndex]
+  const progress = exercises.length > 0 ? ((currentWordIndex + 1) / exercises.length) * 100 : 0
 
   const handleBackToDashboard = () => {
     router("/dashboard")
   }
 
-  const handleStartRecording = () => {
+  const handleStartRecording = async () => {
     setIsRecording(true)
     // Simulate recording for 3 seconds
-    setTimeout(() => {
+    setTimeout(async () => {
       setIsRecording(false)
       // Simulate AI analysis result
       const score = Math.floor(Math.random() * 30) + 70 // Random score between 70-100
       setSessionResults((prev) => [...prev, score])
+
+      // Update session with current progress
+      if (currentSessionId) {
+        try {
+          await sessionsRepository.update(currentSessionId, {
+            score: Math.round(sessionResults.reduce((sum, s) => sum + s, score) / (sessionResults.length + 1)),
+            correctItems: sessionResults.length + 1,
+          });
+        } catch (error) {
+          console.error('Error updating session:', error);
+        }
+      }
 
       toast({
         title: "Análise concluída!",
@@ -53,23 +103,40 @@ export default function ExercisePage() {
       })
 
       // Move to next word or finish session
-      if (currentWordIndex < EXERCISE_WORDS.length - 1) {
+      if (currentWordIndex < exercises.length - 1) {
         setTimeout(() => setCurrentWordIndex((prev) => prev + 1), 1500)
       } else {
         // Session completed
-        setTimeout(() => {
+        if (currentSessionId) {
+          try {
+            const finalScore = Math.round(sessionResults.reduce((sum, s) => sum + s, score) / (sessionResults.length + 1));
+            await sessionsRepository.completeSession(currentSessionId, {
+              score: finalScore,
+              correctItems: sessionResults.length + 1,
+              finishedAt: new Date().toISOString(),
+            });
+            router(`/results?sessionId=${currentSessionId}`)
+          } catch (error) {
+            console.error('Error completing session:', error);
+            router("/results")
+          }
+        } else {
           router("/results")
-        }, 2000)
+        }
       }
     }, 3000)
   }
 
   const handleSkipWord = () => {
-    if (currentWordIndex < EXERCISE_WORDS.length - 1) {
+    if (currentWordIndex < exercises.length - 1) {
       setCurrentWordIndex((prev) => prev + 1)
       setSessionResults((prev) => [...prev, 0])
     } else {
-      router("/results")
+      if (currentSessionId) {
+        router(`/results?sessionId=${currentSessionId}`)
+      } else {
+        router("/results")
+      }
     }
   }
 
@@ -85,8 +152,29 @@ export default function ExercisePage() {
     })
   }
 
-  if (!user) {
-    return <div>Carregando...</div>
+  if (!user || listLoading || !exerciseList) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (exercises.length === 0) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="bg-card border-border">
+          <CardContent className="p-8 text-center">
+            <p className="text-muted-foreground mb-4">
+              Nenhum exercício disponível nesta lista.
+            </p>
+            <Button onClick={() => router("/dashboard")}>
+              Voltar ao Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -101,7 +189,7 @@ export default function ExercisePage() {
             </Button>
             <div className="flex items-center space-x-4">
               <Badge >
-                Palavra {currentWordIndex + 1}/{EXERCISE_WORDS.length}
+                Palavra {currentWordIndex + 1}/{exercises.length}
               </Badge>
               <Button variant="outline" size="sm" onClick={handlePauseSession}>
                 {isPaused ? <Play className="w-4 h-4 mr-2" /> : <Pause className="w-4 h-4 mr-2" />}
@@ -118,7 +206,7 @@ export default function ExercisePage() {
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">Progresso da Sessão</span>
             <span className="text-sm font-medium">
-              {currentWordIndex + 1} de {EXERCISE_WORDS.length} palavras
+              {currentWordIndex + 1} de {exercises.length} palavras
             </span>
           </div>
           <Progress value={progress} className="h-2" />
@@ -131,7 +219,7 @@ export default function ExercisePage() {
               <Brain className="w-6 h-6 text-primary mr-2" />
               <Badge>{isRecording ? "IA Analisando" : "Pronto para Gravar"}</Badge>
             </div>
-            <CardTitle className="text-2xl">Exercício de Consoantes</CardTitle>
+            <CardTitle className="text-2xl">{exerciseList.title}</CardTitle>
             <CardDescription>Pronuncie a palavra destacada claramente no microfone</CardDescription>
           </CardHeader>
           <CardContent>
@@ -141,9 +229,9 @@ export default function ExercisePage() {
                 <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={playWordAudio}>
                   <Volume2 className="w-5 h-5" />
                 </Button>
-                <div className="text-6xl font-bold text-primary tracking-wider">{currentWord.word}</div>
+                <div className="text-6xl font-bold text-primary tracking-wider">{currentWord?.word || ''}</div>
               </div>
-              <p className="text-muted-foreground mt-4">{currentWord.tip}</p>
+              <p className="text-muted-foreground mt-4">{currentWord?.tip || ''}</p>
             </div>
 
             {/* Recording Controls */}

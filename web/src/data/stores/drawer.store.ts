@@ -1,4 +1,3 @@
-import { DrawerProps } from '@/presentation/components';
 import { create } from 'zustand';
 
 type Props = {

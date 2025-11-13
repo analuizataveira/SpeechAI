@@ -1,3 +1,4 @@
+import React from "react"
 import { Button, Card } from "@/presentation/components"
 import { Mic, Brain, TrendingUp, FileText, Users, Shield } from "lucide-react"
 import { Link } from "react-router-dom"

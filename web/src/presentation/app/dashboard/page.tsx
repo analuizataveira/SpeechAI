@@ -1,14 +1,17 @@
 "use client"
 
+import React from "react"
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/hooks/user-provider"
+import { useSessions } from "@/hooks/use-sessions"
+import { useExerciseLists } from "@/hooks/use-exercise-lists"
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/presentation/components"
 import LogoutIcon from "@/presentation/components/icons/logout-icon"
 import Settings from "@/presentation/components/icons/settings"
 import { Badge } from "@/presentation/components/ui/badge"
 import { Progress } from "@/presentation/components/ui/progress"
-import { Award, Brain, FileText, Mic, Play, TrendingUp } from "lucide-react"
-import { useEffect } from "react"
+import { Award, Brain, FileText, Mic, Play, TrendingUp, Loader2 } from "lucide-react"
+import { useEffect, useMemo } from "react"
 import { Link, useNavigate } from "react-router-dom"
 
 
@@ -16,6 +19,8 @@ export default function DashboardPage() {
   const { user, isAuthenticated, logout } = useUser()
   const { toast } = useToast()
   const router = useNavigate()
+  const { sessions, loading: sessionsLoading } = useSessions()
+  const { exerciseLists, loading: listsLoading } = useExerciseLists()
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -23,8 +28,69 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated, router])
 
-  const handleLogout = () => {
-    logout()
+  // Calculate statistics from sessions
+  const stats = useMemo(() => {
+    if (!Array.isArray(sessions)) {
+      return {
+        totalSessions: 0,
+        avgScore: 0,
+        totalWords: 0,
+        improvement: 0,
+      };
+    }
+    const completedSessions = sessions.filter(s => s.finishedAt);
+    const totalSessions = completedSessions.length;
+    const avgScore = completedSessions.length > 0
+      ? Math.round(completedSessions.reduce((sum, s) => sum + (s.score || 0), 0) / completedSessions.length)
+      : 0;
+    const totalWords = completedSessions.reduce((sum, s) => sum + (s.correctItems || 0), 0);
+    
+    // Calculate improvement (compare last 7 days with previous 7 days)
+    const now = new Date();
+    const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    
+    const recentSessions = completedSessions.filter(s => 
+      new Date(s.finishedAt!) >= lastWeek
+    );
+    const previousSessions = completedSessions.filter(s => {
+      const finished = new Date(s.finishedAt!);
+      return finished >= twoWeeksAgo && finished < lastWeek;
+    });
+    
+    const recentAvg = recentSessions.length > 0
+      ? recentSessions.reduce((sum, s) => sum + (s.score || 0), 0) / recentSessions.length
+      : 0;
+    const previousAvg = previousSessions.length > 0
+      ? previousSessions.reduce((sum, s) => sum + (s.score || 0), 0) / previousSessions.length
+      : 0;
+    
+    const improvement = previousAvg > 0 ? Math.round(recentAvg - previousAvg) : 0;
+
+    return {
+      totalSessions,
+      avgScore,
+      totalWords,
+      improvement,
+    };
+  }, [sessions]);
+
+  // Get recommended exercise list (first available or most recent)
+  const recommendedList = useMemo(() => {
+    if (!Array.isArray(exerciseLists) || exerciseLists.length === 0) return null;
+    return exerciseLists[0]; // You can add logic to select based on user profile
+  }, [exerciseLists]);
+
+  const handleStartExercise = () => {
+    if (recommendedList) {
+      router(`/exercise?listId=${recommendedList.id}`)
+    } else {
+      router("/exercise")
+    }
+  }
+
+  const handleLogout = async () => {
+    await logout()
     toast({
       title: "Logout realizado",
       description: "Até logo! Volte sempre para continuar seus exercícios.",
@@ -32,12 +98,13 @@ export default function DashboardPage() {
     router("/")
   }
 
-  const handleStartExercise = () => {
-    router("/exercise")
-  }
 
-  if (!user) {
-    return <div>Carregando...</div>
+  if (!user || sessionsLoading || listsLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
@@ -80,8 +147,10 @@ export default function DashboardPage() {
               <CardTitle className="text-sm font-medium">Sessões Completas</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{user.sessionsCompleted}</div>
-              <p className="text-xs text-muted-foreground">+3 desde a semana passada</p>
+              <div className="text-2xl font-bold">{stats.totalSessions}</div>
+              <p className="text-xs text-muted-foreground">
+                {stats.improvement > 0 ? `+${stats.improvement}% de melhoria` : 'Continue praticando!'}
+              </p>
             </CardContent>
           </Card>
 
@@ -91,8 +160,10 @@ export default function DashboardPage() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{user.averageAccuracy}%</div>
-              <p className="text-xs text-success">+12% de melhoria</p>
+              <div className="text-2xl font-bold">{stats.avgScore}%</div>
+              <p className="text-xs text-success">
+                {stats.improvement > 0 ? `+${stats.improvement}% de melhoria` : 'Mantenha o foco!'}
+              </p>
             </CardContent>
           </Card>
 
@@ -102,8 +173,8 @@ export default function DashboardPage() {
               <Mic className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{user.wordsCompleted}</div>
-              <p className="text-xs text-muted-foreground">Diferentes palavras</p>
+              <div className="text-2xl font-bold">{stats.totalWords}</div>
+              <p className="text-xs text-muted-foreground">Palavras praticadas</p>
             </CardContent>
           </Card>
 
@@ -132,24 +203,41 @@ export default function DashboardPage() {
                 <CardDescription>Baseado no seu perfil e progresso recente</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between p-4 bg-primary/5 rounded-lg border border-primary/20">
-                  <div>
-                    <h3 className="font-semibold">Exercício de Consoantes</h3>
-                    <p className="text-sm text-muted-foreground">Foco em sons /r/ e /l/ • 15 palavras • ~10 min</p>
-                    <div className="flex items-center mt-2">
-                      <Badge variant="secondary" className="mr-2 capitalize">
-                        {user.speechDifficulty}
-                      </Badge>
-                      <Badge variant="outline" className="capitalize">
-                        Nível {user.level}
-                      </Badge>
+                {recommendedList ? (
+                  <div className="flex items-center justify-between p-4 bg-primary/5 rounded-lg border border-primary/20">
+                    <div>
+                      <h3 className="font-semibold">{recommendedList.title}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {recommendedList.items?.length || 0} exercícios • 
+                        {recommendedList.diffType?.description && ` ${recommendedList.diffType.description}`}
+                      </p>
+                      <div className="flex items-center mt-2">
+                        <Badge variant="secondary" className="mr-2 capitalize">
+                          {recommendedList.difficultyLevel}
+                        </Badge>
+                        {recommendedList.diffType && (
+                          <Badge variant="outline">
+                            {recommendedList.diffType.description}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
+                    <Button size="lg" onClick={handleStartExercise}>
+                      <Play className="w-4 h-4 mr-2" />
+                      Iniciar
+                    </Button>
                   </div>
-                  <Button size="lg" onClick={handleStartExercise}>
-                    <Play className="w-4 h-4 mr-2" />
-                    Iniciar
-                  </Button>
-                </div>
+                ) : (
+                  <div className="p-4 bg-muted/50 rounded-lg border border-border text-center">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Nenhuma lista de exercícios disponível no momento.
+                    </p>
+                    <Button size="lg" onClick={handleStartExercise} variant="outline">
+                      <Play className="w-4 h-4 mr-2" />
+                      Ver Exercícios
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -160,79 +248,58 @@ export default function DashboardPage() {
                 <CardDescription>Sua evolução nos últimos 7 dias</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Segunda-feira</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={85} className="w-24" />
-                      <span className="text-sm font-medium">85%</span>
+                {(() => {
+                  if (!Array.isArray(sessions)) {
+                    return <div className="text-center text-muted-foreground">Carregando dados...</div>;
+                  }
+                  
+                  const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+                  const now = new Date();
+                  const weekProgress = days.map((day, index) => {
+                    const dayStart = new Date(now);
+                    dayStart.setDate(now.getDate() - (now.getDay() - index));
+                    dayStart.setHours(0, 0, 0, 0);
+                    const dayEnd = new Date(dayStart);
+                    dayEnd.setHours(23, 59, 59, 999);
+                    
+                    const daySessions = sessions.filter(s => {
+                      if (!s.finishedAt) return false;
+                      const finished = new Date(s.finishedAt);
+                      return finished >= dayStart && finished <= dayEnd;
+                    });
+                    
+                    const avgScore = daySessions.length > 0
+                      ? Math.round(daySessions.reduce((sum, s) => sum + (s.score || 0), 0) / daySessions.length)
+                      : 0;
+                    
+                    return { day, score: avgScore, count: daySessions.length };
+                  });
+
+                  return (
+                    <div className="space-y-4">
+                      {weekProgress.map(({ day, score, count }) => (
+                        <div key={day} className="flex items-center justify-between">
+                          <span className="text-sm">{day}-feira</span>
+                          <div className="flex items-center space-x-2">
+                            <Progress value={score} className="w-24" />
+                            <span className="text-sm font-medium">
+                              {score > 0 ? `${score}%` : '--'}
+                            </span>
+                            {count > 0 && (
+                              <span className="text-xs text-muted-foreground">({count})</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Terça-feira</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={72} className="w-24" />
-                      <span className="text-sm font-medium">72%</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Quarta-feira</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={90} className="w-24" />
-                      <span className="text-sm font-medium">90%</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Quinta-feira</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={78} className="w-24" />
-                      <span className="text-sm font-medium">78%</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Sexta-feira</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={88} className="w-24" />
-                      <span className="text-sm font-medium">88%</span>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Recent Activity */}
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle>Atividade Recente</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-success rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Sessão concluída</p>
-                    <p className="text-xs text-muted-foreground">Há 2 horas</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-primary rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Nova conquista</p>
-                    <p className="text-xs text-muted-foreground">Ontem</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-warning rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Relatório gerado</p>
-                    <p className="text-xs text-muted-foreground">2 dias atrás</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Quick Actions */}
             <Card className="bg-card border-border">
               <CardHeader>

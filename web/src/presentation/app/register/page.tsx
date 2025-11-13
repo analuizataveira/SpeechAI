@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import React, { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Button } from "@/presentation/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/presentation/components/ui/card"
@@ -19,6 +17,7 @@ export default function RegisterPage() {
     firstName: "",
     lastName: "",
     email: "",
+    phone: "",
     age: "",
     speechDifficulty: "",
     password: "",
@@ -57,13 +56,27 @@ export default function RegisterPage() {
 
     setIsLoading(true)
 
+    if (!formData.phone) {
+      toast({
+        title: "Erro no cadastro",
+        description: "Por favor, informe seu telefone.",
+        variant: "destructive",
+      })
+      setIsLoading(false)
+      return
+    }
+
     try {
+      const age = getAgeFromRange(formData.age)
+      const birthDate = getBirthDateFromAge(age)
+      
       const success = await register({
         name: `${formData.firstName} ${formData.lastName}`,
         email: formData.email,
-        age: getAgeFromRange(formData.age),
-        speechDifficulty: formData.speechDifficulty as any,
+        phone: formData.phone,
+        birthDate: birthDate,
         password: formData.password,
+        role: 'PATIENT',
       })
 
       if (success) {
@@ -72,11 +85,18 @@ export default function RegisterPage() {
           description: "Bem-vindo ao SpeechAI. Vamos começar seus exercícios!",
         })
         router("/dashboard")
+      } else {
+        toast({
+          title: "Erro no cadastro",
+          description: "Não foi possível criar sua conta. Verifique os dados e tente novamente.",
+          variant: "destructive",
+        })
       }
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || error?.message || "Ocorreu um erro inesperado. Tente novamente."
       toast({
         title: "Erro no cadastro",
-        description: "Ocorreu um erro inesperado. Tente novamente.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -97,6 +117,13 @@ export default function RegisterPage() {
       default:
         return 25
     }
+  }
+
+  const getBirthDateFromAge = (age: number): string => {
+    const today = new Date();
+    const birthYear = today.getFullYear() - age;
+    const birthDate = new Date(birthYear, today.getMonth(), today.getDate());
+    return birthDate.toISOString();
   }
 
   return (
@@ -151,6 +178,19 @@ export default function RegisterPage() {
                   className="bg-input border-border"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefone</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="(00) 00000-0000"
+                  className="bg-input border-border"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange("phone", e.target.value)}
                   required
                 />
               </div>

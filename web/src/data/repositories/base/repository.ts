@@ -1,11 +1,8 @@
-import {
-  LOCAL_STORAGE_KEYS,
-  LocalStorageKey,
-} from '@/domain/constants/local-storage'
 import { AxiosInstance } from 'axios'
 import { httpClient } from './httpClient'
-import { IResponseError } from '@/domain/types'
-import { exceptions } from '@/domain/constants/exceptions'
+import { LOCAL_STORAGE_KEYS, LocalStorageKey } from '../../../domain/constants/local-storage'
+import { IResponseError } from '../../../domain/types/http'
+import { exceptions } from '../../../domain/constants/exceptions'
 
 export class BaseRepository {
   path: string
@@ -13,7 +10,7 @@ export class BaseRepository {
 
   constructor(path: string) {
     this.path = path
-    this.httpClient = httpClient
+    this.httpClient = httpClient;
 
     httpClient.interceptors.request.use(
       config => {
