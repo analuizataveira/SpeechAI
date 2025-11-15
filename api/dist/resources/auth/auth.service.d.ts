@@ -5,6 +5,7 @@ import { IAuthService } from './interfaces/auth.service.interface';
 import { LoginDto } from './dtos/login.dto';
 import { AuthResponseDto } from './dtos/auth-response.dto';
 import { MeResponseDto } from './dtos/me-response.dto';
+import { LogoutResponseDto } from './dtos/logout-response.dto';
 export declare class AuthService implements IAuthService {
     private readonly prisma;
     private readonly jwtService;
@@ -12,4 +13,5 @@ export declare class AuthService implements IAuthService {
     constructor(prisma: PrismaService, jwtService: JwtService, configService: ConfigService);
     login(loginDto: LoginDto): Promise<AuthResponseDto>;
     getMe(userId: string): Promise<MeResponseDto>;
+    logout(userId: string): Promise<LogoutResponseDto>;
 }

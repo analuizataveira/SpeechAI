@@ -5,10 +5,11 @@ import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/hooks/user-provider"
 import { useExerciseList } from "@/hooks/use-exercise-lists"
 import { SessionsRepository } from "@/data/repositories/sessions/repository"
+import { TranscriptionRepository } from "@/data/repositories/transcription/repository"
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/presentation/components"
 import { Progress } from "@/presentation/components/ui/progress"
 import { ArrowLeft, Badge, Brain, Mic, MicOff, Pause, Play, RotateCcw, Volume2, Loader2 } from "lucide-react"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 
 export default function ExercisePage() {
@@ -17,14 +18,22 @@ export default function ExercisePage() {
   const [isPaused, setIsPaused] = useState(false)
   const [sessionResults, setSessionResults] = useState<number[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [currentFeedback, setCurrentFeedback] = useState<string>("")
   const { user, isAuthenticated } = useUser()
   const router = useNavigate()
   const { toast } = useToast()
   const [searchParams] = useSearchParams()
   const listId = searchParams.get('listId')
   
-  const { exerciseList, loading: listLoading } = useExerciseList(listId)
+  const { exerciseList, loading: listLoading, error: listError } = useExerciseList(listId)
   const sessionsRepository = new SessionsRepository()
+  const transcriptionRepository = new TranscriptionRepository()
+  
+  // Audio recording refs
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -32,9 +41,21 @@ export default function ExercisePage() {
     }
   }, [isAuthenticated, router])
 
+  // Check if listId is missing
+  useEffect(() => {
+    if (!listId && isAuthenticated) {
+      toast({
+        title: "Lista de exercícios não encontrada",
+        description: "Por favor, selecione uma lista de exercícios do dashboard.",
+        variant: "destructive",
+      });
+      router("/dashboard");
+    }
+  }, [listId, isAuthenticated, router, toast]);
+
   // Initialize session when exercise list is loaded
   useEffect(() => {
-    if (exerciseList && !currentSessionId) {
+    if (exerciseList?.id && !currentSessionId) {
       const createSession = async () => {
         try {
           const response = await sessionsRepository.create({
@@ -55,7 +76,8 @@ export default function ExercisePage() {
       };
       createSession();
     }
-  }, [exerciseList, currentSessionId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exerciseList?.id, currentSessionId]);
 
   const exercises = useMemo(() => {
     if (!exerciseList?.items) return [];
@@ -77,55 +99,307 @@ export default function ExercisePage() {
   }
 
   const handleStartRecording = async () => {
-    setIsRecording(true)
-    // Simulate recording for 3 seconds
-    setTimeout(async () => {
-      setIsRecording(false)
-      // Simulate AI analysis result
-      const score = Math.floor(Math.random() * 30) + 70 // Random score between 70-100
-      setSessionResults((prev) => [...prev, score])
+    // Prevent starting if already recording or processing
+    if (isRecording || isProcessing) {
+      console.warn('Already recording or processing')
+      return
+    }
 
-      // Update session with current progress
-      if (currentSessionId) {
-        try {
-          await sessionsRepository.update(currentSessionId, {
-            score: Math.round(sessionResults.reduce((sum, s) => sum + s, score) / (sessionResults.length + 1)),
-            correctItems: sessionResults.length + 1,
-          });
-        } catch (error) {
-          console.error('Error updating session:', error);
+    try {
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+
+      // Create MediaRecorder with timeslice to get data periodically
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus',
+      })
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      // Collect audio chunks
+      mediaRecorder.ondataavailable = (event) => {
+        console.log('Data available:', event.data.size)
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
         }
       }
 
-      toast({
-        title: "Análise concluída!",
-        description: `Pontuação: ${score}% - Continue assim!`,
-      })
+      // Handle recording stop
+      mediaRecorder.onstop = async () => {
+        console.log('MediaRecorder stopped, processing audio...')
+        try {
+          // Stop all tracks
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => {
+              track.stop()
+              console.log('Track stopped:', track.kind)
+            })
+            streamRef.current = null
+          }
 
-      // Move to next word or finish session
-      if (currentWordIndex < exercises.length - 1) {
-        setTimeout(() => setCurrentWordIndex((prev) => prev + 1), 1500)
+          // Create blob from chunks
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+          console.log('Audio blob created:', audioBlob.size, 'bytes')
+          
+          // Reset chunks for next recording
+          audioChunksRef.current = []
+          
+          // Process transcription
+          await processAudioTranscription(audioBlob)
+        } catch (error: any) {
+          console.error('Error in onstop handler:', error)
+          setIsProcessing(false)
+          setIsRecording(false)
+          toast({
+            title: "Erro ao processar gravação",
+            description: error?.message || "Não foi possível processar a gravação.",
+            variant: "destructive",
+          })
+        }
+      }
+      
+      // Handle errors
+      mediaRecorder.onerror = (event: any) => {
+        console.error('MediaRecorder error:', event)
+        setIsRecording(false)
+        setIsProcessing(false)
+        toast({
+          title: "Erro na gravação",
+          description: "Ocorreu um erro durante a gravação. Tente novamente.",
+          variant: "destructive",
+        })
+      }
+
+      // Start recording without timeslice (only collect data when stopped)
+      mediaRecorder.start()
+      setIsRecording(true)
+      console.log('Recording started, state:', mediaRecorder.state)
+    } catch (error: any) {
+      console.error('Error starting recording:', error)
+      setIsRecording(false)
+      toast({
+        title: "Erro ao acessar microfone",
+        description: error?.message || "Não foi possível acessar o microfone. Verifique as permissões.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleStopRecording = () => {
+    console.log('=== handleStopRecording called ===', {
+      hasMediaRecorder: !!mediaRecorderRef.current,
+      isRecording,
+      state: mediaRecorderRef.current?.state,
+      streamActive: !!streamRef.current
+    })
+    
+    const mediaRecorder = mediaRecorderRef.current
+    
+    if (!mediaRecorder) {
+      console.error('ERROR: MediaRecorder not available!')
+      setIsRecording(false)
+      setIsProcessing(false)
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+        streamRef.current = null
+      }
+      return
+    }
+
+    const state = mediaRecorder.state
+    console.log('MediaRecorder state:', state)
+
+    // Set processing state immediately to prevent double-clicks
+    setIsRecording(false)
+    setIsProcessing(true)
+
+    try {
+      // Stop the MediaRecorder
+      if (state === 'recording') {
+        console.log('Stopping MediaRecorder (state: recording)...')
+        mediaRecorder.stop()
+        console.log('MediaRecorder.stop() called, new state:', mediaRecorder.state)
+        // The onstop handler will process the audio and update states
+      } else if (state === 'paused') {
+        console.log('Stopping MediaRecorder (state: paused)...')
+        mediaRecorder.stop()
+        console.log('MediaRecorder.stop() called, new state:', mediaRecorder.state)
+      } else if (state === 'inactive') {
+        console.warn('MediaRecorder already inactive, forcing cleanup')
+        // Already stopped, just clean up and process
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop())
+          streamRef.current = null
+        }
+        // Process any collected audio chunks
+        if (audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+          audioChunksRef.current = []
+          processAudioTranscription(audioBlob)
+        } else {
+          setIsProcessing(false)
+        }
       } else {
-        // Session completed
+        console.warn('MediaRecorder in unexpected state:', state)
+        // Force cleanup
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop())
+          streamRef.current = null
+        }
+        setIsProcessing(false)
+      }
+    } catch (error: any) {
+      console.error('ERROR stopping recording:', error)
+      toast({
+        title: "Erro ao parar gravação",
+        description: error?.message || "Não foi possível parar a gravação.",
+        variant: "destructive",
+      })
+      setIsProcessing(false)
+      setIsRecording(false)
+      
+      // Try to clean up
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+        streamRef.current = null
+      }
+      mediaRecorderRef.current = null
+    }
+  }
+
+  const processAudioTranscription = async (audioBlob: Blob) => {
+    if (!currentWord?.word) {
+      setIsProcessing(false)
+      return
+    }
+
+    try {
+      const response = await transcriptionRepository.transcribeAudio(
+        audioBlob,
+        currentWord.word
+      )
+
+      if (response.success) {
+        const transcriptionData = response as any
+        // Extract score - ensure it's a number
+        const score = typeof transcriptionData.score === 'number' 
+          ? transcriptionData.score 
+          : typeof transcriptionData.score === 'string'
+          ? parseFloat(transcriptionData.score.replace('%', '')) || 0
+          : 0
+        
+        // Ensure score is between 0 and 100
+        const normalizedScore = Math.max(0, Math.min(100, Math.round(score)))
+        
+        setSessionResults((prev) => [...prev, normalizedScore])
+        
+        // Extract feedback - prefer feedback, then transcribedText
+        const feedback = transcriptionData.feedback || transcriptionData.analise || transcriptionData.transcribedText || ""
+        setCurrentFeedback(feedback)
+
+        // Update session with current progress
         if (currentSessionId) {
           try {
-            const finalScore = Math.round(sessionResults.reduce((sum, s) => sum + s, score) / (sessionResults.length + 1));
-            await sessionsRepository.completeSession(currentSessionId, {
-              score: finalScore,
+            await sessionsRepository.update(currentSessionId, {
+              score: Math.round(sessionResults.reduce((sum, s) => sum + s, normalizedScore) / (sessionResults.length + 1)),
               correctItems: sessionResults.length + 1,
-              finishedAt: new Date().toISOString(),
-            });
-            router(`/results?sessionId=${currentSessionId}`)
+            })
           } catch (error) {
-            console.error('Error completing session:', error);
+            console.error('Error updating session:', error)
+          }
+        }
+
+        // Show toast with formatted message
+        const feedbackPreview = feedback.length > 100 
+          ? feedback.substring(0, 100) + '...' 
+          : feedback
+        
+        toast({
+          title: `Pontuação: ${normalizedScore}%`,
+          description: feedbackPreview || "Análise concluída!",
+          duration: 5000,
+        })
+
+        setIsProcessing(false)
+
+        // Move to next word or finish session
+        if (currentWordIndex < exercises.length - 1) {
+          setTimeout(() => {
+            setCurrentWordIndex((prev) => prev + 1)
+            setCurrentFeedback("")
+          }, 2000)
+        } else {
+          // Session completed
+          if (currentSessionId) {
+            try {
+              const finalScore = Math.round(sessionResults.reduce((sum, s) => sum + s, score) / (sessionResults.length + 1))
+              await sessionsRepository.completeSession(currentSessionId, {
+                score: finalScore,
+                correctItems: sessionResults.length + 1,
+                finishedAt: new Date().toISOString(),
+              })
+              router(`/results?sessionId=${currentSessionId}`)
+            } catch (error) {
+              console.error('Error completing session:', error)
+              router("/results")
+            }
+          } else {
             router("/results")
           }
-        } else {
-          router("/results")
+        }
+      } else {
+        throw new Error(response.message || "Erro ao processar áudio")
+      }
+    } catch (error: any) {
+      console.error('Error transcribing audio:', error)
+      toast({
+        title: "Erro ao processar áudio",
+        description: error?.message || "Não foi possível processar a gravação. Tente novamente.",
+        variant: "destructive",
+      })
+      setIsProcessing(false)
+    }
+  }
+
+  // Keyboard shortcut to stop recording (Space or Enter)
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only handle if not typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+
+      if ((e.key === ' ' || e.key === 'Enter') && isRecording) {
+        e.preventDefault()
+        console.log('Keyboard shortcut triggered to stop recording')
+        handleStopRecording()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyPress)
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress)
+    }
+  }, [isRecording])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      console.log('Component unmounting, cleaning up...')
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop()
+        } catch (error) {
+          console.error('Error stopping MediaRecorder on unmount:', error)
         }
       }
-    }, 3000)
-  }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+        streamRef.current = null
+      }
+    }
+  }, [])
 
   const handleSkipWord = () => {
     if (currentWordIndex < exercises.length - 1) {
@@ -152,10 +426,35 @@ export default function ExercisePage() {
     })
   }
 
+  // Show error if list failed to load
+  if (listError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="bg-card border-border">
+          <CardContent className="p-8 text-center">
+            <p className="text-destructive mb-4">
+              Erro ao carregar lista de exercícios
+            </p>
+            <p className="text-muted-foreground mb-4">{listError}</p>
+            <Button onClick={() => router("/dashboard")}>
+              Voltar ao Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Show loading or missing data
   if (!user || listLoading || !exerciseList) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">
+            {!listId ? "Carregando lista de exercícios..." : listLoading ? "Carregando exercícios..." : "Preparando exercícios..."}
+          </p>
+        </div>
       </div>
     )
   }
@@ -236,39 +535,125 @@ export default function ExercisePage() {
 
             {/* Recording Controls */}
             <div className="flex flex-col items-center space-y-6">
-              <div className="relative">
-                <Button
-                  size="lg"
-                  className={`w-24 h-24 rounded-full ${
-                    isRecording
-                      ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                      : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                  }`}
-                  onClick={handleStartRecording}
-                  disabled={isRecording || isPaused}
-                >
-                  <Mic className="w-8 h-8" />
-                </Button>
-                {isRecording && (
-                  <div className="absolute -inset-2 rounded-full border-2 border-destructive animate-pulse"></div>
+              <div className="flex items-center gap-4">
+                {/* Start Recording Button */}
+                {!isRecording && (
+                  <div className="relative">
+                    <Button
+                      size="lg"
+                      className={`w-24 h-24 rounded-full ${
+                        isProcessing
+                          ? "bg-muted text-muted-foreground"
+                          : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                      }`}
+                      onClick={async (e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        
+                        if (!isProcessing && !isPaused && !isRecording) {
+                          console.log('Starting recording...')
+                          await handleStartRecording()
+                        }
+                      }}
+                      disabled={isProcessing || isPaused}
+                      type="button"
+                    >
+                      {isProcessing ? (
+                        <Loader2 className="w-8 h-8 animate-spin" />
+                      ) : (
+                        <Mic className="w-8 h-8" />
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Stop Recording Button - Show if recording OR if MediaRecorder is actually recording */}
+                {(isRecording || mediaRecorderRef.current?.state === 'recording') && (
+                  <div className="relative">
+                    <Button
+                      size="lg"
+                      className="w-24 h-24 rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground active:scale-95"
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        console.log('🛑 Stop button clicked!', {
+                          isRecording,
+                          mediaRecorderState: mediaRecorderRef.current?.state,
+                          hasMediaRecorder: !!mediaRecorderRef.current,
+                          streamActive: !!streamRef.current,
+                          timestamp: new Date().toISOString()
+                        })
+                        // Force stop immediately
+                        const mr = mediaRecorderRef.current
+                        if (mr && (mr.state === 'recording' || mr.state === 'paused')) {
+                          console.log('Force stopping MediaRecorder...')
+                          try {
+                            mr.stop()
+                            setIsRecording(false)
+                            setIsProcessing(true)
+                          } catch (err) {
+                            console.error('Error in button click:', err)
+                            handleStopRecording()
+                          }
+                        } else {
+                          handleStopRecording()
+                        }
+                      }}
+                      disabled={isProcessing}
+                      type="button"
+                    >
+                      <MicOff className="w-8 h-8" />
+                    </Button>
+                    <div className="absolute -inset-2 rounded-full border-2 border-destructive animate-pulse"></div>
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      Ou pressione Espaço/Enter
+                    </p>
+                  </div>
                 )}
               </div>
 
               <div className="text-center">
-                <p className={`text-lg font-medium mb-2 ${isRecording ? "text-destructive" : "text-foreground"}`}>
-                  {isRecording ? "Gravando..." : "Toque para gravar"}
+                <p className={`text-lg font-medium mb-2 ${
+                  isRecording ? "text-destructive" : 
+                  isProcessing ? "text-muted-foreground" : 
+                  "text-foreground"
+                }`}>
+                  {isRecording ? "Gravando... (Clique no botão vermelho para parar)" : 
+                   isProcessing ? "Processando áudio..." : 
+                   "Clique no botão para iniciar a gravação"}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {isRecording ? "Pronuncie a palavra claramente" : "Mantenha pressionado para gravar sua pronúncia"}
+                  {isRecording ? "Pronuncie a palavra claramente e clique no botão vermelho para parar e enviar" : 
+                   isProcessing ? "Aguarde enquanto analisamos sua pronúncia" :
+                   "Clique no botão azul para iniciar a gravação"}
                 </p>
               </div>
 
               <div className="flex items-center space-x-4">
-                <Button variant="outline" onClick={handleStartRecording} disabled={isRecording}>
+                <Button 
+                  variant="outline" 
+                  onClick={async () => {
+                    // Stop current recording if active
+                    if (mediaRecorderRef.current && (isRecording || mediaRecorderRef.current.state === 'recording')) {
+                      handleStopRecording()
+                      // Wait a bit before starting new recording
+                      await new Promise(resolve => setTimeout(resolve, 500))
+                    }
+                    // Start new recording
+                    if (!isProcessing && !isPaused && !isRecording) {
+                      await handleStartRecording()
+                    }
+                  }} 
+                  disabled={isRecording || isProcessing}
+                >
                   <RotateCcw className="w-4 h-4 mr-2" />
                   Tentar Novamente
                 </Button>
-                <Button variant="outline" onClick={handleSkipWord} disabled={isRecording}>
+                <Button variant="outline" onClick={handleSkipWord} disabled={isRecording || isProcessing}>
                   <MicOff className="w-4 h-4 mr-2" />
                   Pular Palavra
                 </Button>
@@ -288,28 +673,54 @@ export default function ExercisePage() {
           <CardContent>
             <div className="grid md:grid-cols-3 gap-6">
               <div className="text-center">
-                <div className="text-2xl font-bold text-primary mb-1">
+                <div className={`text-2xl font-bold mb-1 ${
+                  sessionResults.length > 0 
+                    ? sessionResults[sessionResults.length - 1] >= 80 
+                      ? "text-green-600" 
+                      : sessionResults[sessionResults.length - 1] >= 60
+                      ? "text-yellow-600"
+                      : "text-red-600"
+                    : "text-muted-foreground"
+                }`}>
                   {sessionResults.length > 0 ? `${sessionResults[sessionResults.length - 1]}%` : "--"}
                 </div>
-                <p className="text-sm text-muted-foreground">Precisão Fonética</p>
+                <p className="text-sm text-muted-foreground">Pontuação Atual</p>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-accent mb-1">{isRecording ? "Analisando..." : "Bom"}</div>
-                <p className="text-sm text-muted-foreground">Clareza</p>
+                <div className="text-2xl font-bold text-primary mb-1">
+                  {sessionResults.length > 0 
+                    ? Math.round(sessionResults.reduce((sum, s) => sum + s, 0) / sessionResults.length)
+                    : 0}%
+                </div>
+                <p className="text-sm text-muted-foreground">Média da Sessão</p>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-warning mb-1">Normal</div>
-                <p className="text-sm text-muted-foreground">Velocidade</p>
+                <div className="text-2xl font-bold text-accent mb-1">
+                  {sessionResults.length}/{exercises.length}
+                </div>
+                <p className="text-sm text-muted-foreground">Palavras Completas</p>
               </div>
             </div>
 
             <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-              <h4 className="font-medium mb-2">Feedback da IA:</h4>
-              <p className="text-sm text-muted-foreground">
-                {isRecording
-                  ? "Analisando sua pronúncia..."
-                  : `Boa pronúncia do som ${currentWord.focus}! Tente manter a língua um pouco mais relaxada para um som mais natural. Continue assim!`}
-              </p>
+              <h4 className="font-medium mb-2 flex items-center gap-2">
+                <Brain className="w-4 h-4 text-primary" />
+                Análise da IA:
+              </h4>
+              <div className="text-sm text-foreground whitespace-pre-wrap">
+                {isRecording ? (
+                  <p className="text-muted-foreground">Gravando sua pronúncia...</p>
+                ) : isProcessing ? (
+                  <p className="text-muted-foreground">Analisando sua pronúncia...</p>
+                ) : currentFeedback ? (
+                  <p className="leading-relaxed">{currentFeedback}</p>
+                ) : (
+                  <p className="text-muted-foreground">
+                    Pronuncie a palavra <strong>"{currentWord.word}"</strong> claramente. 
+                    {currentWord.focus && ` Foque na pronúncia correta do som ${currentWord.focus}.`}
+                  </p>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

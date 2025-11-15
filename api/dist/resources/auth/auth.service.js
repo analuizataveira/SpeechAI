@@ -114,6 +114,18 @@ let AuthService = class AuthService {
                 : undefined,
         };
     }
+    async logout(userId) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw new common_1.UnauthorizedException('User not found');
+        }
+        return {
+            success: true,
+            message: 'Logout successful',
+        };
+    }
 };
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([

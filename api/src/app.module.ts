@@ -8,6 +8,7 @@ import { DifficultiesModule } from './resources/difficulties/difficulties.module
 import { ExercisesModule } from './resources/exercises/exercises.module';
 import { ExerciseListsModule } from './resources/exercise-lists/exercise-lists.module';
 import { SessionsModule } from './resources/sessions/sessions.module';
+import { TranscriptionModule } from './resources/transcription/transcription.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -24,6 +25,7 @@ import configuration from './config/configuration';
     ExercisesModule,
     ExerciseListsModule,
     SessionsModule,
+    TranscriptionModule,
   ],
 })
 export class AppModule {}
