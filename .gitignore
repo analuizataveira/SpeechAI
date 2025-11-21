@@ -5,6 +5,7 @@
 /tmp
 /api/node_modules
 /web/node_modules
+/api/dist
 
 # Logs
 logs
