@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
@@ -55,6 +56,10 @@
   "devDependencies": {
     "@eslint/js": "^9.19.0",
     "@tanstack/react-table": "^8.20.5",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/cls-hooked": "^4.3.9",
     "@types/eslint": "^8.56.1",
     "@types/node": "^22.13.4",
@@ -68,12 +73,13 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.18",
     "globals": "^15.14.0",
+    "jsdom": "^27.2.0",
     "prettier": "^3.5.1",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.22.0",
     "vite": "^6.1.0",
     "vite-plugin-node-polyfills": "^0.23.0",
-    "vitest": "^3.0.6"
+    "vitest": "^4.0.13"
   }
 }
