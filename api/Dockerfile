@@ -1,4 +1,6 @@
-FROM node:18-alpine
+FROM node:22-alpine
+
+RUN apk add --no-cache openssl
 
 WORKDIR /usr/src/app
 
@@ -8,6 +10,8 @@ COPY yarn.lock ./
 RUN yarn install
 
 COPY . .
+
+RUN npx prisma generate
 
 RUN yarn build
 
