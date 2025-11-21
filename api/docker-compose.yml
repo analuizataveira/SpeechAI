@@ -20,6 +20,7 @@ services:
     container_name: speech_ai_api
     ports:
       - "3000:3000"
+    command: yarn start:dev
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/speech_ai
