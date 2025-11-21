@@ -25,3 +25,8 @@ lerna-debug.log*
 # temp directory
 .temp
 .tmp
+
+# Tests
+/coverage
+/api/coverage
+/web/coverage
