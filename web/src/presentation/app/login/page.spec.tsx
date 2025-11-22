@@ -4,26 +4,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import React from "react"
 
-// 1. Mocks dos Hooks Globais
 const mockLogin = vi.fn();
 const mockNavigate = vi.fn();
 const mockToast = vi.fn();
 
-// Mock do useUser
 vi.mock('@/hooks/user-provider', () => ({
   useUser: () => ({
     login: mockLogin,
   }),
 }));
 
-// Mock do useToast
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({
     toast: mockToast,
   }),
 }));
 
-// Mock do useNavigate
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
   return {
@@ -32,7 +28,6 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-// Componente Wrapper com Router (necessário para o Link "Cadastre-se")
 const PageWrapper = () => (
   <BrowserRouter>
     <LoginPage />
@@ -54,7 +49,6 @@ describe('Page: Login', () => {
   });
 
   it('deve chamar a função de login com os dados corretos', async () => {
-    // Configura o mock para retornar sucesso
     mockLogin.mockResolvedValue(true);
 
     render(<PageWrapper />);
@@ -67,15 +61,10 @@ describe('Page: Login', () => {
     const submitButton = screen.getByRole('button', { name: 'Entrar' });
     fireEvent.click(submitButton);
 
-    // Verifica se o loading apareceu (opcional, pode ser muito rápido)
-    // expect(screen.getByText('Entrando...')).toBeInTheDocument();
-
-    // Aguarda a chamada assíncrona
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('teste@email.com', '123456');
     });
 
-    // Verifica sucesso
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
@@ -85,7 +74,6 @@ describe('Page: Login', () => {
   });
 
   it('deve exibir erro se o login falhar', async () => {
-    // Configura o mock para retornar falha
     mockLogin.mockResolvedValue(false);
 
     render(<PageWrapper />);
@@ -102,7 +90,6 @@ describe('Page: Login', () => {
       }));
     });
 
-    // Garante que NÃO navegou
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 });
