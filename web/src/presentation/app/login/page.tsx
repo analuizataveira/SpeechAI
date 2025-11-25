@@ -1,12 +1,10 @@
 "use client"
 
-import type React from "react"
-
+import React, { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/hooks/user-provider"
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@/presentation/components"
-import { ArrowLeft, Link, Loader2, Mic } from "lucide-react"
-import { useState } from "react"
+import { ArrowLeft, Loader2, Mic } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
 export default function LoginPage() {
@@ -38,15 +36,16 @@ export default function LoginPage() {
       } else {
         toast({
           title: "Erro no login",
-          description: "Email ou senha incorretos.",
-          variant: "destructive",
+          description: "Email ou senha incorretos. Verifique suas credenciais e tente novamente.",
+          variant: "error",
         })
       }
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || error?.message || "Ocorreu um erro inesperado. Tente novamente."
       toast({
         title: "Erro no login",
-        description: "Ocorreu um erro inesperado. Tente novamente.",
-        variant: "destructive",
+        description: errorMessage,
+        variant: "error",
       })
     } finally {
       setIsLoading(false)

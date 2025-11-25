@@ -3,6 +3,8 @@
 /node_modules
 /build
 /tmp
+/api/node_modules
+/web/node_modules
 
 # Logs
 logs

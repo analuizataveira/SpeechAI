@@ -20,6 +20,7 @@ const difficulties_module_1 = require("./resources/difficulties/difficulties.mod
 const exercises_module_1 = require("./resources/exercises/exercises.module");
 const exercise_lists_module_1 = require("./resources/exercise-lists/exercise-lists.module");
 const sessions_module_1 = require("./resources/sessions/sessions.module");
+const transcription_module_1 = require("./resources/transcription/transcription.module");
 const configuration_1 = __importDefault(require("./config/configuration"));
 let AppModule = class AppModule {
 };
@@ -39,6 +40,7 @@ exports.AppModule = AppModule = __decorate([
             exercises_module_1.ExercisesModule,
             exercise_lists_module_1.ExerciseListsModule,
             sessions_module_1.SessionsModule,
+            transcription_module_1.TranscriptionModule,
         ],
     })
 ], AppModule);

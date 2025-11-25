@@ -1,4 +1,5 @@
-import { ModalProps } from '@/presentation/components/internal/modals/modals';
+import React from 'react';
+import { ModalProps } from '@/presentation/components/internal/modals';
 import { create } from 'zustand';
 
 type Props = {

@@ -7,6 +7,7 @@ import { IAuthService } from './interfaces/auth.service.interface';
 import { LoginDto } from './dtos/login.dto';
 import { AuthResponseDto } from './dtos/auth-response.dto';
 import { MeResponseDto } from './dtos/me-response.dto';
+import { LogoutResponseDto } from './dtos/logout-response.dto';
 
 @Injectable()
 export class AuthService implements IAuthService {
@@ -83,6 +84,26 @@ export class AuthService implements IAuthService {
             phone: user.patientProfile.phone,
           }
         : undefined,
+    };
+  }
+
+  async logout(userId: string): Promise<LogoutResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // In a stateless JWT system, logout is primarily client-side
+    // The token is removed from client storage
+    // If you want to implement token blacklisting in the future,
+    // you can add it here
+
+    return {
+      success: true,
+      message: 'Logout successful',
     };
   }
 }
