@@ -12,7 +12,7 @@ export class TranscriptionService implements ITranscriptionService {
   constructor(private readonly configService: ConfigService) {
     this.n8nWebhookUrl =
       this.configService.get<string>('N8N_WEBHOOK_URL') ||
-      'https://testessss.app.n8n.cloud/webhook/audio-to-transcribe';
+      'https://speechai.app.n8n.cloud/webhook-test/audio-to-transcribe';
   }
 
   async transcribeAudio(

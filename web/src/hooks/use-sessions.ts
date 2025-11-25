@@ -9,51 +9,91 @@ export function useSessions() {
 
   const sessionsRepository = new SessionsRepository();
 
+  const extractArray = (data: any): ISessionResponse[] => {
+    console.log('🔍 extractArray input:', data);
+    
+    // The BaseRepository interceptor wraps responses in { success: true, data: {...} }
+    // When API returns array directly, interceptor creates: { success: true, data: { success: true, 0: {...}, 1: {...}, length: N } }
+    
+    // Step 1: Extract the inner data
+    let apiResponse = data;
+    if (data?.data) {
+      apiResponse = data.data;
+    }
+    
+    // Step 2: If it's already an array, return it
+    if (Array.isArray(apiResponse)) {
+      console.log('✅ Found array directly:', apiResponse.length);
+      return apiResponse;
+    }
+    
+    // Step 3: Check if it's an array-like object (has numeric keys)
+    if (apiResponse && typeof apiResponse === 'object') {
+      // Check for numeric keys or length property
+      const keys = Object.keys(apiResponse);
+      const numericKeys = keys.filter(k => /^\d+$/.test(k));
+      const hasLength = apiResponse.length !== undefined && typeof apiResponse.length === 'number';
+      
+      if (numericKeys.length > 0 || hasLength) {
+        const array: ISessionResponse[] = [];
+        const length = apiResponse.length || numericKeys.length;
+        
+        console.log(`📊 Found array-like object with ${length} items`);
+        
+        for (let i = 0; i < length; i++) {
+          if (apiResponse[i] && typeof apiResponse[i] === 'object') {
+            const item = apiResponse[i];
+            // Remove non-session properties
+            const { success, length: _, ...cleanItem } = item;
+            array.push(cleanItem as ISessionResponse);
+          }
+        }
+        
+        if (array.length > 0) {
+          console.log('✅ Extracted array from array-like object:', array.length);
+          return array;
+        }
+      }
+      
+      // Step 4: Try to find array in nested data property
+      if (apiResponse.data && Array.isArray(apiResponse.data)) {
+        console.log('✅ Found array in data property:', apiResponse.data.length);
+        return apiResponse.data;
+      }
+      
+      // Step 5: Try to find any array in object values
+      const { success, length: _, data: __, ...rest } = apiResponse;
+      const values = Object.values(rest);
+      for (const value of values) {
+        if (Array.isArray(value) && value.length > 0) {
+          console.log('✅ Found array in object values:', value.length);
+          return value as ISessionResponse[];
+        }
+      }
+    }
+    
+    console.warn('⚠️ Could not extract array from:', apiResponse);
+    return [];
+  };
+
   const fetchMySessions = async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await sessionsRepository.findMySessions();
+      console.log('🔍 Raw response from findMySessions:', response);
+      
       if (response.success) {
-        // The response is ISessionResponse[] & { success: true }
-        // When the backend returns an array, the interceptor spreads it
-        // So we need to check if response itself is an array or extract it
-        const sessionsData = response as any;
-        
-        // If it's already an array, use it directly
-        if (Array.isArray(sessionsData)) {
-          setSessions(sessionsData);
-        } 
-        // If it has a data property that's an array
-        else if (sessionsData.data && Array.isArray(sessionsData.data)) {
-          setSessions(sessionsData.data);
-        }
-        // If the array was spread into numeric properties (0, 1, 2, etc.)
-        else if (sessionsData.length !== undefined && typeof sessionsData.length === 'number') {
-          const sessionsArray: ISessionResponse[] = [];
-          for (let i = 0; i < sessionsData.length; i++) {
-            if (sessionsData[i] && typeof sessionsData[i] === 'object') {
-              sessionsArray.push(sessionsData[i]);
-            }
-          }
-          setSessions(sessionsArray);
-        }
-        // Fallback: try to extract any array-like structure
-        else {
-          // Remove 'success' and other non-array properties, then check remaining
-          const { success, ...rest } = sessionsData;
-          const values = Object.values(rest);
-          if (values.length > 0 && Array.isArray(values[0])) {
-            setSessions(values[0] as ISessionResponse[]);
-          } else {
-            setSessions([]);
-          }
-        }
+        const sessionsArray = extractArray(response);
+        console.log('✅ Extracted sessions array:', sessionsArray.length, 'sessions');
+        setSessions(sessionsArray);
       } else {
+        console.error('❌ Response not successful:', response);
         setError('Erro ao carregar sessões');
         setSessions([]);
       }
     } catch (err: any) {
+      console.error('❌ Error fetching sessions:', err);
       setError(err?.message || 'Erro ao carregar sessões');
       setSessions([]);
     } finally {

@@ -22,7 +22,7 @@ let TranscriptionService = class TranscriptionService {
         this.configService = configService;
         this.n8nWebhookUrl =
             this.configService.get('N8N_WEBHOOK_URL') ||
-                'https://testessss.app.n8n.cloud/webhook/audio-to-transcribe';
+                'https://speechai.app.n8n.cloud/webhook-test/audio-to-transcribe';
     }
     async transcribeAudio(audioFile, targetWord) {
         if (!audioFile) {
@@ -42,17 +42,54 @@ let TranscriptionService = class TranscriptionService {
                 timeout: 30000,
             });
             const responseData = response.data;
+            console.log('📥 Raw response from n8n webhook:', JSON.stringify(responseData, null, 2));
             if (typeof responseData === 'number') {
                 return {
-                    pontuacao: responseData,
+                    score: responseData,
                 };
             }
             if (typeof responseData === 'object') {
-                return {
-                    score: responseData.score ?? responseData.note ?? responseData.grade ?? 0,
-                    transcribedText: responseData.transcribedText ?? responseData.text,
-                    feedback: responseData.feedback ?? responseData.message,
+                let score = 0;
+                if (responseData.pontuacao !== undefined) {
+                    if (typeof responseData.pontuacao === 'string') {
+                        score = parseFloat(responseData.pontuacao.replace('%', '').trim()) || 0;
+                    }
+                    else {
+                        score = responseData.pontuacao;
+                    }
+                }
+                else if (responseData.score !== undefined) {
+                    score = typeof responseData.score === 'string'
+                        ? parseFloat(responseData.score.replace('%', '')) || 0
+                        : responseData.score;
+                }
+                else if (responseData.note !== undefined) {
+                    score = typeof responseData.note === 'string'
+                        ? parseFloat(responseData.note.replace('%', '')) || 0
+                        : responseData.note;
+                }
+                else if (responseData.grade !== undefined) {
+                    score = typeof responseData.grade === 'string'
+                        ? parseFloat(responseData.grade.replace('%', '')) || 0
+                        : responseData.grade;
+                }
+                score = Math.max(0, Math.min(100, score));
+                const feedback = responseData.analise
+                    ?? responseData.feedback
+                    ?? responseData.message
+                    ?? responseData.analysis
+                    ?? '';
+                const transcribedText = responseData.transcribedText
+                    ?? responseData.text
+                    ?? responseData.transcricao
+                    ?? '';
+                const result = {
+                    score: Math.round(score),
+                    transcribedText,
+                    feedback: feedback.trim(),
                 };
+                console.log('✅ Processed transcription result:', JSON.stringify(result, null, 2));
+                return result;
             }
             return {
                 score: 0,

@@ -3,6 +3,31 @@ export interface ICreateSessionRequest {
   startedAt: string;
 }
 
+export interface IExerciseListItem {
+  id: string;
+  exerciseId: string;
+  exerciseListId: string;
+  order?: number;
+  exercise?: {
+    id: string;
+    text: string;
+    diffTypeId: string;
+  };
+}
+
+export interface IExerciseList {
+  id: string;
+  doctorId: string;
+  diffTypeId: string;
+  title: string;
+  difficultyLevel: string;
+  diffType?: {
+    id: string;
+    description: string;
+  };
+  items?: IExerciseListItem[];
+}
+
 export interface ISessionResponse {
   id: string;
   patientId: string;
@@ -14,6 +39,7 @@ export interface ISessionResponse {
   finishedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+  exerciseList?: IExerciseList;
 }
 
 export interface IUpdateSessionRequest {

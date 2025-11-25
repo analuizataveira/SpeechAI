@@ -10,6 +10,7 @@ import ReportsPage from "@/presentation/app/reports/page";
 import LoginPage from "@/presentation/app/login/page";
 import RegisterPage from "@/presentation/app/register/page";
 import SettingsPage from "@/presentation/app/settings/page";
+import HistoryPage from "@/presentation/app/history/page";
 
 const router = createBrowserRouter([
   {
@@ -47,6 +48,10 @@ const router = createBrowserRouter([
       {
         path: AppRoutes.BASE.SETTINGS.key,
         element: <SettingsPage />,
+      },
+      {
+        path: AppRoutes.BASE.HISTORY.key,
+        element: <HistoryPage />,
       },
     ],
   },

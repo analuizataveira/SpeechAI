@@ -25,5 +25,8 @@ export const AppRoutes = {
     SETTINGS: {
       key: "/settings",
     },
+    HISTORY: {
+      key: "/history",
+    },
   },
 } as const;
