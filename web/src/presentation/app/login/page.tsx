@@ -37,7 +37,7 @@ export default function LoginPage() {
         toast({
           title: "Erro no login",
           description: "Email ou senha incorretos. Verifique suas credenciais e tente novamente.",
-          variant: "destructive",
+          variant: "error",
         })
       }
     } catch (error: any) {
@@ -45,7 +45,7 @@ export default function LoginPage() {
       toast({
         title: "Erro no login",
         description: errorMessage,
-        variant: "destructive",
+        variant: "error",
       })
     } finally {
       setIsLoading(false)

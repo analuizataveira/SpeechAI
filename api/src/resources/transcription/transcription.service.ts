@@ -42,6 +42,7 @@ export class TranscriptionService implements ITranscriptionService {
 
       // Parse response from n8n
       const responseData = response.data;
+      console.log('📥 Raw response from n8n webhook:', JSON.stringify(responseData, null, 2));
 
       // Handle different response formats
       if (typeof responseData === 'number') {
@@ -55,10 +56,13 @@ export class TranscriptionService implements ITranscriptionService {
         let score = 0;
         
         if (responseData.pontuacao !== undefined) {
-          // Handle "pontuacao": "100" or "pontuacao": 100
-          score = typeof responseData.pontuacao === 'string' 
-            ? parseFloat(responseData.pontuacao) || 0
-            : responseData.pontuacao;
+          // Handle "pontuacao": "100%" or "pontuacao": "100" or "pontuacao": 100
+          if (typeof responseData.pontuacao === 'string') {
+            // Remove % sign and parse
+            score = parseFloat(responseData.pontuacao.replace('%', '').trim()) || 0;
+          } else {
+            score = responseData.pontuacao;
+          }
         } else if (responseData.score !== undefined) {
           score = typeof responseData.score === 'string' 
             ? parseFloat(responseData.score.replace('%', '')) || 0
@@ -89,11 +93,14 @@ export class TranscriptionService implements ITranscriptionService {
           ?? responseData.transcricao
           ?? '';
 
-        return {
+        const result = {
           score: Math.round(score),
           transcribedText,
           feedback: feedback.trim(),
         };
+        
+        console.log('✅ Processed transcription result:', JSON.stringify(result, null, 2));
+        return result;
       }
 
       // Fallback: try to extract score from any format

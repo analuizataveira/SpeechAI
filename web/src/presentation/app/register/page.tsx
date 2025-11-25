@@ -40,7 +40,7 @@ export default function RegisterPage() {
       toast({
         title: "Erro no cadastro",
         description: "As senhas não coincidem.",
-        variant: "destructive",
+        variant: "error",
       })
       return
     }
@@ -49,7 +49,7 @@ export default function RegisterPage() {
       toast({
         title: "Erro no cadastro",
         description: "Você deve aceitar os termos de uso.",
-        variant: "destructive",
+        variant: "error",
       })
       return
     }
@@ -60,7 +60,7 @@ export default function RegisterPage() {
       toast({
         title: "Erro no cadastro",
         description: "Por favor, informe seu telefone.",
-        variant: "destructive",
+        variant: "error",
       })
       setIsLoading(false)
       return
@@ -89,7 +89,7 @@ export default function RegisterPage() {
         toast({
           title: "Erro no cadastro",
           description: "Não foi possível criar sua conta. Verifique os dados e tente novamente.",
-          variant: "destructive",
+          variant: "error",
         })
       }
     } catch (error: any) {
@@ -97,7 +97,7 @@ export default function RegisterPage() {
       toast({
         title: "Erro no cadastro",
         description: errorMessage,
-        variant: "destructive",
+        variant: "error",
       })
     } finally {
       setIsLoading(false)

@@ -1,4 +1,5 @@
 export declare class TranscriptionResponseDto {
-    pontuacao: number;
-    analise?: string;
+    score: number;
+    transcribedText?: string;
+    feedback?: string;
 }

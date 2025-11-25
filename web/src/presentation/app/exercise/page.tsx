@@ -47,7 +47,7 @@ export default function ExercisePage() {
       toast({
         title: "Lista de exercícios não encontrada",
         description: "Por favor, selecione uma lista de exercícios do dashboard.",
-        variant: "destructive",
+        variant: "error",
       });
       router("/dashboard");
     }
@@ -70,7 +70,7 @@ export default function ExercisePage() {
           toast({
             title: "Erro ao iniciar sessão",
             description: error?.message || "Não foi possível iniciar a sessão",
-            variant: "destructive",
+            variant: "error",
           });
         }
       };
@@ -100,8 +100,17 @@ export default function ExercisePage() {
 
   const handleStartRecording = async () => {
     // Prevent starting if already recording or processing
-    if (isRecording || isProcessing) {
-      console.warn('Already recording or processing')
+    // Check both React state and MediaRecorder state
+    const isCurrentlyRecording = isRecording || 
+      (mediaRecorderRef.current && 
+       (mediaRecorderRef.current.state === 'recording' || mediaRecorderRef.current.state === 'paused'))
+    
+    if (isCurrentlyRecording || isProcessing) {
+      console.warn('Already recording or processing', {
+        isRecording,
+        isProcessing,
+        mediaRecorderState: mediaRecorderRef.current?.state
+      })
       return
     }
 
@@ -154,7 +163,7 @@ export default function ExercisePage() {
           toast({
             title: "Erro ao processar gravação",
             description: error?.message || "Não foi possível processar a gravação.",
-            variant: "destructive",
+            variant: "error",
           })
         }
       }
@@ -167,21 +176,25 @@ export default function ExercisePage() {
         toast({
           title: "Erro na gravação",
           description: "Ocorreu um erro durante a gravação. Tente novamente.",
-          variant: "destructive",
+          variant: "error",
         })
       }
 
       // Start recording without timeslice (only collect data when stopped)
       mediaRecorder.start()
       setIsRecording(true)
-      console.log('Recording started, state:', mediaRecorder.state)
+      console.log('✅ Recording started successfully!', {
+        mediaRecorderState: mediaRecorder.state,
+        isRecording: true,
+        timestamp: new Date().toISOString()
+      })
     } catch (error: any) {
       console.error('Error starting recording:', error)
       setIsRecording(false)
       toast({
         title: "Erro ao acessar microfone",
         description: error?.message || "Não foi possível acessar o microfone. Verifique as permissões.",
-        variant: "destructive",
+        variant: "error",
       })
     }
   }
@@ -208,7 +221,7 @@ export default function ExercisePage() {
     }
 
     const state = mediaRecorder.state
-    console.log('MediaRecorder state:', state)
+    console.log('MediaRecorder state before stop:', state)
 
     // Set processing state immediately to prevent double-clicks
     setIsRecording(false)
@@ -216,15 +229,28 @@ export default function ExercisePage() {
 
     try {
       // Stop the MediaRecorder
-      if (state === 'recording') {
-        console.log('Stopping MediaRecorder (state: recording)...')
-        mediaRecorder.stop()
-        console.log('MediaRecorder.stop() called, new state:', mediaRecorder.state)
-        // The onstop handler will process the audio and update states
-      } else if (state === 'paused') {
-        console.log('Stopping MediaRecorder (state: paused)...')
-        mediaRecorder.stop()
-        console.log('MediaRecorder.stop() called, new state:', mediaRecorder.state)
+      if (state === 'recording' || state === 'paused') {
+        console.log(`Stopping MediaRecorder (state: ${state})...`)
+        try {
+          mediaRecorder.stop()
+          console.log('MediaRecorder.stop() called successfully, new state:', mediaRecorder.state)
+          // The onstop handler will process the audio and update states
+        } catch (stopError: any) {
+          console.error('Error calling mediaRecorder.stop():', stopError)
+          // Force cleanup if stop() fails
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop())
+            streamRef.current = null
+          }
+          // Process any collected audio chunks
+          if (audioChunksRef.current.length > 0) {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+            audioChunksRef.current = []
+            processAudioTranscription(audioBlob)
+          } else {
+            setIsProcessing(false)
+          }
+        }
       } else if (state === 'inactive') {
         console.warn('MediaRecorder already inactive, forcing cleanup')
         // Already stopped, just clean up and process
@@ -254,7 +280,7 @@ export default function ExercisePage() {
       toast({
         title: "Erro ao parar gravação",
         description: error?.message || "Não foi possível parar a gravação.",
-        variant: "destructive",
+        variant: "error",
       })
       setIsProcessing(false)
       setIsRecording(false)
@@ -282,20 +308,37 @@ export default function ExercisePage() {
 
       if (response.success) {
         const transcriptionData = response as any
-        // Extract score - ensure it's a number
-        const score = typeof transcriptionData.score === 'number' 
-          ? transcriptionData.score 
-          : typeof transcriptionData.score === 'string'
-          ? parseFloat(transcriptionData.score.replace('%', '')) || 0
-          : 0
+        console.log('📊 Transcription response:', transcriptionData)
+        
+        // Extract score - handle multiple formats: score, pontuacao (with or without %)
+        let score = 0
+        if (transcriptionData.score !== undefined) {
+          score = typeof transcriptionData.score === 'number' 
+            ? transcriptionData.score 
+            : parseFloat(String(transcriptionData.score).replace('%', '').trim()) || 0
+        } else if (transcriptionData.pontuacao !== undefined) {
+          // Handle "pontuacao": "100%" or "pontuacao": "100" or "pontuacao": 100
+          if (typeof transcriptionData.pontuacao === 'string') {
+            score = parseFloat(transcriptionData.pontuacao.replace('%', '').trim()) || 0
+          } else {
+            score = transcriptionData.pontuacao
+          }
+        }
         
         // Ensure score is between 0 and 100
         const normalizedScore = Math.max(0, Math.min(100, Math.round(score)))
         
         setSessionResults((prev) => [...prev, normalizedScore])
         
-        // Extract feedback - prefer feedback, then transcribedText
-        const feedback = transcriptionData.feedback || transcriptionData.analise || transcriptionData.transcribedText || ""
+        // Extract feedback - prefer analise (from API), then feedback, then transcribedText
+        const feedback = transcriptionData.analise 
+          || transcriptionData.feedback 
+          || transcriptionData.analysis
+          || transcriptionData.transcribedText 
+          || transcriptionData.message
+          || ""
+        
+        console.log('✅ Processed transcription:', { score: normalizedScore, feedback })
         setCurrentFeedback(feedback)
 
         // Update session with current progress
@@ -356,32 +399,36 @@ export default function ExercisePage() {
       toast({
         title: "Erro ao processar áudio",
         description: error?.message || "Não foi possível processar a gravação. Tente novamente.",
-        variant: "destructive",
+        variant: "error",
       })
       setIsProcessing(false)
     }
   }
 
-  // Keyboard shortcut to stop recording (Space or Enter)
+  // Sync React state with MediaRecorder state
   useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      // Only handle if not typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return
-      }
-
-      if ((e.key === ' ' || e.key === 'Enter') && isRecording) {
-        e.preventDefault()
-        console.log('Keyboard shortcut triggered to stop recording')
-        handleStopRecording()
+    const checkRecordingState = () => {
+      const mediaRecorder = mediaRecorderRef.current
+      if (mediaRecorder) {
+        const isActuallyRecording = mediaRecorder.state === 'recording' || mediaRecorder.state === 'paused'
+        if (isActuallyRecording && !isRecording) {
+          console.log('🔄 Syncing state: MediaRecorder is recording, updating React state')
+          setIsRecording(true)
+        } else if (!isActuallyRecording && isRecording && !isProcessing) {
+          console.log('🔄 Syncing state: MediaRecorder is not recording, updating React state')
+          setIsRecording(false)
+        }
       }
     }
 
-    window.addEventListener('keydown', handleKeyPress)
-    return () => {
-      window.removeEventListener('keydown', handleKeyPress)
-    }
-  }, [isRecording])
+    // Check immediately
+    checkRecordingState()
+
+    // Check periodically to keep state in sync
+    const interval = setInterval(checkRecordingState, 100)
+
+    return () => clearInterval(interval)
+  }, [isRecording, isProcessing])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -432,7 +479,7 @@ export default function ExercisePage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="bg-card border-border">
           <CardContent className="p-8 text-center">
-            <p className="text-destructive mb-4">
+            <p className="text-red-500 mb-4">
               Erro ao carregar lista de exercícios
             </p>
             <p className="text-muted-foreground mb-4">{listError}</p>
@@ -536,100 +583,89 @@ export default function ExercisePage() {
             {/* Recording Controls */}
             <div className="flex flex-col items-center space-y-6">
               <div className="flex items-center gap-4">
-                {/* Start Recording Button */}
-                {!isRecording && (
-                  <div className="relative">
-                    <Button
-                      size="lg"
-                      className={`w-24 h-24 rounded-full ${
-                        isProcessing
-                          ? "bg-muted text-muted-foreground"
-                          : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                      }`}
-                      onClick={async (e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        
-                        if (!isProcessing && !isPaused && !isRecording) {
-                          console.log('Starting recording...')
-                          await handleStartRecording()
-                        }
-                      }}
-                      disabled={isProcessing || isPaused}
-                      type="button"
-                    >
-                      {isProcessing ? (
-                        <Loader2 className="w-8 h-8 animate-spin" />
-                      ) : (
-                        <Mic className="w-8 h-8" />
-                      )}
-                    </Button>
-                  </div>
-                )}
-
-                {/* Stop Recording Button - Show if recording OR if MediaRecorder is actually recording */}
-                {(isRecording || mediaRecorderRef.current?.state === 'recording') && (
-                  <div className="relative">
-                    <Button
-                      size="lg"
-                      className="w-24 h-24 rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground active:scale-95"
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        console.log('🛑 Stop button clicked!', {
-                          isRecording,
-                          mediaRecorderState: mediaRecorderRef.current?.state,
-                          hasMediaRecorder: !!mediaRecorderRef.current,
-                          streamActive: !!streamRef.current,
-                          timestamp: new Date().toISOString()
-                        })
-                        // Force stop immediately
-                        const mr = mediaRecorderRef.current
-                        if (mr && (mr.state === 'recording' || mr.state === 'paused')) {
-                          console.log('Force stopping MediaRecorder...')
-                          try {
-                            mr.stop()
-                            setIsRecording(false)
-                            setIsProcessing(true)
-                          } catch (err) {
-                            console.error('Error in button click:', err)
-                            handleStopRecording()
-                          }
-                        } else {
-                          handleStopRecording()
-                        }
-                      }}
-                      disabled={isProcessing}
-                      type="button"
-                    >
+                {/* Toggle Recording Button */}
+                <div className="relative">
+                  <Button
+                    size="lg"
+                    className={`w-24 h-24 rounded-full relative z-10 ${
+                      isProcessing
+                        ? "bg-muted text-muted-foreground cursor-not-allowed"
+                        : isRecording
+                        ? "bg-error hover:bg-error/90 text-error-foreground"
+                        : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                    }`}
+                    onMouseDown={() => {
+                      console.log('🖱️ Button mouseDown event!', {
+                        isProcessing,
+                        isPaused,
+                        isRecording,
+                        mediaRecorderState: mediaRecorderRef.current?.state
+                      })
+                    }}
+                    onClick={async (e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      
+                      // Check MediaRecorder state directly at click time (not React state)
+                      const currentMediaRecorderState = mediaRecorderRef.current?.state
+                      const isCurrentlyRecording = isRecording || 
+                        (currentMediaRecorderState === 'recording' || currentMediaRecorderState === 'paused')
+                      
+                      console.log('🔴 Button clicked!', {
+                        isProcessing,
+                        isPaused,
+                        isRecording,
+                        mediaRecorderState: currentMediaRecorderState,
+                        isCurrentlyRecording,
+                        timestamp: new Date().toISOString()
+                      })
+                      
+                      if (isProcessing || isPaused) {
+                        console.log('Button click blocked: isProcessing or isPaused')
+                        return
+                      }
+                      
+                      // Directly handle start/stop based on actual MediaRecorder state
+                      if (isCurrentlyRecording) {
+                        console.log('🛑 Stopping recording from button click...')
+                        handleStopRecording()
+                      } else {
+                        console.log('🎤 Starting recording from button click...')
+                        await handleStartRecording()
+                      }
+                    }}
+                    disabled={isProcessing || isPaused}
+                    type="button"
+                    style={{ pointerEvents: 'auto', zIndex: 10 }}
+                  >
+                    {isProcessing ? (
+                      <Loader2 className="w-8 h-8 animate-spin" />
+                    ) : isRecording ? (
                       <MicOff className="w-8 h-8" />
-                    </Button>
-                    <div className="absolute -inset-2 rounded-full border-2 border-destructive animate-pulse"></div>
-                    <p className="text-xs text-muted-foreground mt-2 text-center">
-                      Ou pressione Espaço/Enter
-                    </p>
-                  </div>
-                )}
+                    ) : (
+                      <Mic className="w-8 h-8" />
+                    )}
+                  </Button>
+                  {isRecording && (
+                    <div className="absolute -inset-2 rounded-full border-2 border-error animate-pulse pointer-events-none z-0"></div>
+                  )}
+                </div>
               </div>
 
               <div className="text-center">
                 <p className={`text-lg font-medium mb-2 ${
-                  isRecording ? "text-destructive" : 
+                  isRecording ? "text-error" : 
                   isProcessing ? "text-muted-foreground" : 
                   "text-foreground"
                 }`}>
-                  {isRecording ? "Gravando... (Clique no botão vermelho para parar)" : 
+                  {isRecording ? "Gravando... (Clique novamente para parar)" : 
                    isProcessing ? "Processando áudio..." : 
                    "Clique no botão para iniciar a gravação"}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {isRecording ? "Pronuncie a palavra claramente e clique no botão vermelho para parar e enviar" : 
+                  {isRecording ? "Pronuncie a palavra claramente e clique no botão novamente para parar e enviar" : 
                    isProcessing ? "Aguarde enquanto analisamos sua pronúncia" :
-                   "Clique no botão azul para iniciar a gravação"}
+                   "Clique no botão para iniciar a gravação"}
                 </p>
               </div>
 
