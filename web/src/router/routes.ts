@@ -22,5 +22,8 @@ export const AppRoutes = {
     REPORTS: {
       key: "/reports",
     },
+    SETTINGS: {
+      key: "/settings",
+    },
   },
 } as const;

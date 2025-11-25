@@ -1,3 +1,4 @@
+import React from 'react';
 import AppLayout from './layout/layout';
 import Modals from './components/internal/modals/modals';
 import { Toaster } from './components/ui/toaster';

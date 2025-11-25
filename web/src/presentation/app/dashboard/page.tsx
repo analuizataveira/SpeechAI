@@ -329,6 +329,7 @@ export default function DashboardPage() {
                 >
                   <Settings className="w-4 h-4 mr-2" />
                   Configurar Perfil
+                  
                 </Button>
               </CardContent>
             </Card>

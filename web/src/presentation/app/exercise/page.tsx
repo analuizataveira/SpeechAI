@@ -20,6 +20,7 @@ export default function ExercisePage() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [currentFeedback, setCurrentFeedback] = useState<string>("")
+  const [isCompleting, setIsCompleting] = useState(false)
   const { user, isAuthenticated } = useUser()
   const router = useNavigate()
   const { toast } = useToast()
@@ -91,8 +92,12 @@ export default function ExercisePage() {
       .filter(ex => ex.word);
   }, [exerciseList]);
 
-  const currentWord = exercises[currentWordIndex]
-  const progress = exercises.length > 0 ? ((currentWordIndex + 1) / exercises.length) * 100 : 0
+  // Ensure currentWordIndex is within bounds
+  const safeWordIndex = exercises.length > 0 
+    ? Math.min(currentWordIndex, Math.max(0, exercises.length - 1))
+    : 0
+  const currentWord = exercises.length > 0 ? exercises[safeWordIndex] : undefined
+  const progress = exercises.length > 0 ? ((safeWordIndex + 1) / exercises.length) * 100 : 0
 
   const handleBackToDashboard = () => {
     router("/dashboard")
@@ -295,8 +300,10 @@ export default function ExercisePage() {
   }
 
   const processAudioTranscription = async (audioBlob: Blob) => {
-    if (!currentWord?.word) {
+    // Safety check: ensure currentWord exists and is valid
+    if (!currentWord?.word || safeWordIndex >= exercises.length) {
       setIsProcessing(false)
+      console.warn('Cannot process audio: currentWord is invalid or index out of bounds')
       return
     }
 
@@ -373,15 +380,18 @@ export default function ExercisePage() {
             setCurrentFeedback("")
           }, 2000)
         } else {
-          // Session completed
+          // Session completed - prevent further rendering
+          setIsCompleting(true)
+          
           if (currentSessionId) {
             try {
-              const finalScore = Math.round(sessionResults.reduce((sum, s) => sum + s, score) / (sessionResults.length + 1))
+              const finalScore = Math.round(sessionResults.reduce((sum, s) => sum + s, normalizedScore) / (sessionResults.length + 1))
               await sessionsRepository.completeSession(currentSessionId, {
                 score: finalScore,
                 correctItems: sessionResults.length + 1,
                 finishedAt: new Date().toISOString(),
               })
+              // Redirect immediately
               router(`/results?sessionId=${currentSessionId}`)
             } catch (error) {
               console.error('Error completing session:', error)
@@ -449,12 +459,24 @@ export default function ExercisePage() {
   }, [])
 
   const handleSkipWord = () => {
-    if (currentWordIndex < exercises.length - 1) {
+    if (safeWordIndex < exercises.length - 1) {
       setCurrentWordIndex((prev) => prev + 1)
       setSessionResults((prev) => [...prev, 0])
     } else {
+      setIsCompleting(true)
       if (currentSessionId) {
-        router(`/results?sessionId=${currentSessionId}`)
+        // Complete session with skipped word
+        sessionsRepository.completeSession(currentSessionId, {
+          score: sessionResults.length > 0 
+            ? Math.round(sessionResults.reduce((sum, s) => sum + s, 0) / sessionResults.length)
+            : 0,
+          correctItems: sessionResults.length,
+          finishedAt: new Date().toISOString(),
+        }).then(() => {
+          router(`/results?sessionId=${currentSessionId}`)
+        }).catch(() => {
+          router("/results")
+        })
       } else {
         router("/results")
       }
@@ -493,13 +515,13 @@ export default function ExercisePage() {
   }
 
   // Show loading or missing data
-  if (!user || listLoading || !exerciseList) {
+  if (!user || listLoading || !exerciseList || isCompleting) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
           <p className="text-muted-foreground">
-            {!listId ? "Carregando lista de exercícios..." : listLoading ? "Carregando exercícios..." : "Preparando exercícios..."}
+            {isCompleting ? "Finalizando sessão..." : !listId ? "Carregando lista de exercícios..." : listLoading ? "Carregando exercícios..." : "Preparando exercícios..."}
           </p>
         </div>
       </div>
@@ -535,7 +557,7 @@ export default function ExercisePage() {
             </Button>
             <div className="flex items-center space-x-4">
               <Badge >
-                Palavra {currentWordIndex + 1}/{exercises.length}
+                Palavra {safeWordIndex + 1}/{exercises.length}
               </Badge>
               <Button variant="outline" size="sm" onClick={handlePauseSession}>
                 {isPaused ? <Play className="w-4 h-4 mr-2" /> : <Pause className="w-4 h-4 mr-2" />}
@@ -549,10 +571,10 @@ export default function ExercisePage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Progress */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">Progresso da Sessão</span>
             <span className="text-sm font-medium">
-              {currentWordIndex + 1} de {exercises.length} palavras
+              {safeWordIndex + 1} de {exercises.length} palavras
             </span>
           </div>
           <Progress value={progress} className="h-2" />
@@ -575,7 +597,9 @@ export default function ExercisePage() {
                 <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={playWordAudio}>
                   <Volume2 className="w-5 h-5" />
                 </Button>
-                <div className="text-6xl font-bold text-primary tracking-wider">{currentWord?.word || ''}</div>
+                <div className="text-6xl font-bold text-primary tracking-wider">
+                  {currentWord?.word || 'Carregando...'}
+                </div>
               </div>
               <p className="text-muted-foreground mt-4">{currentWord?.tip || ''}</p>
             </div>
@@ -750,10 +774,14 @@ export default function ExercisePage() {
                   <p className="text-muted-foreground">Analisando sua pronúncia...</p>
                 ) : currentFeedback ? (
                   <p className="leading-relaxed">{currentFeedback}</p>
-                ) : (
+                ) : currentWord ? (
                   <p className="text-muted-foreground">
                     Pronuncie a palavra <strong>"{currentWord.word}"</strong> claramente. 
                     {currentWord.focus && ` Foque na pronúncia correta do som ${currentWord.focus}.`}
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground">
+                    Carregando palavra...
                   </p>
                 )}
               </div>

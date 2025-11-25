@@ -1,3 +1,4 @@
+import React from "react";
 import { createBrowserRouter } from "react-router-dom";
 import { AppRoutes } from "./routes";
 import App from "@/presentation/app";
@@ -8,6 +9,7 @@ import ResultsPage from "@/presentation/app/results/page";
 import ReportsPage from "@/presentation/app/reports/page";
 import LoginPage from "@/presentation/app/login/page";
 import RegisterPage from "@/presentation/app/register/page";
+import SettingsPage from "@/presentation/app/settings/page";
 
 const router = createBrowserRouter([
   {
@@ -41,7 +43,11 @@ const router = createBrowserRouter([
       {
         path: AppRoutes.BASE.REGISTER.key,
         element: <RegisterPage />,
-      }
+      },
+      {
+        path: AppRoutes.BASE.SETTINGS.key,
+        element: <SettingsPage />,
+      },
     ],
   },
 ]);
