@@ -25,7 +25,16 @@ export class ReportsRepository extends BaseRepository {
       },
     );
 
-    return response.data;
+    // For blob responses, the interceptor returns the axios response directly
+    // so response.data should be the Blob
+    const blob = response.data;
+    
+    if (!(blob instanceof Blob)) {
+      console.error('Response is not a Blob:', blob);
+      throw new Error('Failed to retrieve PDF blob from response');
+    }
+    
+    return blob;
   }
 }
 

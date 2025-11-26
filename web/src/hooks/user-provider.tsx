@@ -22,6 +22,7 @@ interface UserProfile {
 interface UserContextType {
   user: UserProfile | null
   isAuthenticated: boolean
+  userRole: 'PATIENT' | 'DOCTOR' | 'ADMIN' | null
   login: (email: string, password: string) => Promise<boolean>
   register: (userData: {
     name: string;
@@ -30,6 +31,7 @@ interface UserContextType {
     phone: string;
     birthDate: string;
     role?: 'PATIENT' | 'DOCTOR' | 'ADMIN';
+    specialty?: string;
   }) => Promise<boolean>
   logout: () => Promise<void>
   updateProfile: (updates: Partial<UserProfile>) => void
@@ -40,6 +42,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined)
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [userRole, setUserRole] = useState<'PATIENT' | 'DOCTOR' | 'ADMIN' | null>(null)
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
@@ -47,17 +50,42 @@ export function UserProvider({ children }: { children: ReactNode }) {
       
       // Login and get access token
       const loginResponse = await authRepository.login({ email, password });
+      console.log('Login response:', loginResponse);
 
-      if (!loginResponse.success) {
+      // Handle nested response from BaseRepository interceptor
+      // Response format: { success: true, data: { success: true, access_token: ... } }
+      if (!loginResponse || loginResponse.success === false) {
+        console.error('Login failed - no response or success is false');
+        return false;
+      }
+
+      // Check inner success (from the actual API response)
+      const innerData = (loginResponse as any).data;
+      if (innerData && innerData.success === false) {
+        console.error('Login failed - inner success is false');
         return false;
       }
 
       // Get user profile information
       const meResponse = await authRepository.getMe();
+      console.log('Me response:', meResponse);
 
-      if (meResponse.success) {
-        // Type guard: meResponse is IMeResponse & { success: true }
-        const userData = meResponse as IMeResponse & { success: true };
+      // Handle nested response
+      if (meResponse && meResponse.success !== false) {
+        // Extract the actual user data from nested structure
+        let userData: IMeResponse | null = null;
+        const innerMeData = (meResponse as any).data;
+        
+        if (innerMeData && innerMeData.id) {
+          userData = innerMeData as IMeResponse;
+        } else if ((meResponse as any).id) {
+          userData = meResponse as unknown as IMeResponse;
+        }
+        
+        if (!userData) {
+          console.error('Could not extract user data from me response');
+          return false;
+        }
         
         // Convert backend user to frontend UserProfile
         const birthDate = userData.patientProfile?.birthDate 
@@ -84,6 +112,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
         setUser(userProfile);
         setIsAuthenticated(true);
+        setUserRole(userData.role as 'PATIENT' | 'DOCTOR' | 'ADMIN');
         return true;
       }
 
@@ -101,6 +130,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     phone: string;
     birthDate: string;
     role?: 'PATIENT' | 'DOCTOR' | 'ADMIN';
+    specialty?: string;
   }): Promise<boolean> => {
     try {
       const usersRepository = new UsersRepository();
@@ -112,6 +142,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         name: userData.name,
         birthDate: userData.birthDate,
         phone: userData.phone,
+        specialty: userData.specialty,
       };
 
       const response = await usersRepository.createUser(createUserData);
@@ -120,6 +151,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         // Convert backend user to frontend UserProfile
         const birthDate = new Date(response.birthDate);
         const age = new Date().getFullYear() - birthDate.getFullYear();
+        const role = userData.role || 'PATIENT';
         
         const newUser: UserProfile = {
           id: response.id,
@@ -136,6 +168,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
         setUser(newUser);
         setIsAuthenticated(true);
+        setUserRole(role);
         return true;
       }
       
@@ -155,6 +188,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null);
       setIsAuthenticated(false);
+      setUserRole(null);
     }
   }
 
@@ -169,6 +203,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isAuthenticated,
+        userRole,
         login,
         register,
         logout,

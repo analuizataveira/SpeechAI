@@ -25,7 +25,7 @@ import {
 
 
 export default function DashboardPage() {
-  const { user, isAuthenticated, logout } = useUser()
+  const { user, isAuthenticated, userRole, logout } = useUser()
   const { toast } = useToast()
   const router = useNavigate()
   const { sessions, loading: sessionsLoading } = useSessions()
@@ -38,8 +38,15 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!isAuthenticated) {
       router("/login")
+      return
     }
-  }, [isAuthenticated, router])
+    
+    // Redirect doctors to their dashboard
+    if (userRole === 'DOCTOR') {
+      router("/dashboard-doctor")
+      return
+    }
+  }, [isAuthenticated, userRole, router])
 
   // Calculate statistics from sessions
   const stats = useMemo(() => {
@@ -115,18 +122,54 @@ export default function DashboardPage() {
     setIsGeneratingAiExercises(true)
     try {
       const response = await aiExercisesRepository.generateExercisesAndCreateList()
+      console.log("AI Exercises response:", response)
       
-      if (response.success && response.data) {
-        setGeneratedExerciseList(response.data)
-        setAiExercisesDialogOpen(true)
-        toast({
-          title: "Exercícios gerados!",
-          description: "Exercícios personalizados criados com sucesso pela IA.",
-        })
+      // Handle response structure from BaseRepository interceptor
+      // Following the same pattern as use-exercise-lists.ts
+      if (response && (response as any).success !== false) {
+        const innerData = (response as any).data
+        
+        // Find the exercise list data - it might be nested
+        let exerciseListData: any = null
+        
+        // Case 1: innerData is the exercise list directly (has id and items or title)
+        if (innerData && innerData.id && (innerData.items || innerData.title)) {
+          exerciseListData = innerData
+        }
+        // Case 2: innerData.data contains the exercise list
+        else if (innerData && innerData.data && innerData.data.id) {
+          exerciseListData = innerData.data
+        }
+        // Case 3: response itself has the data
+        else if ((response as any).id && ((response as any).items || (response as any).title)) {
+          exerciseListData = response
+        }
+        
+        if (exerciseListData && exerciseListData.id) {
+          // Clean the data - remove success property if exists
+          const { success, ...cleanData } = exerciseListData as any
+          console.log("Exercise list data extracted:", cleanData)
+          
+          toast({
+            title: "Exercícios gerados!",
+            description: "Exercícios personalizados criados com sucesso pela IA.",
+          })
+          // Redirect to exercise page with the generated list
+          router(`/exercise?listId=${cleanData.id}`)
+        } else {
+          console.error("Could not extract exercise list data from response:", { 
+            response, 
+            innerData, 
+            exerciseListData 
+          })
+          throw new Error("Resposta inválida da API: estrutura de dados não reconhecida")
+        }
       } else {
-        throw new Error(response.message || "Erro ao gerar exercícios")
+        const errorMessage = (response as any)?.message || (response as any)?.friendlyMessage || "Erro ao gerar exercícios"
+        throw new Error(errorMessage)
       }
     } catch (error: any) {
+      console.error("Error generating AI exercises:", error)
       toast({
         title: "Erro ao gerar exercícios",
         description: error?.message || "Não foi possível gerar exercícios personalizados.",

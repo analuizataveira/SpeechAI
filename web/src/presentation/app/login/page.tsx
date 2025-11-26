@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const { login } = useUser()
+  const { login, userRole } = useUser()
   const router = useNavigate()
   const { toast } = useToast()
 
@@ -32,6 +32,8 @@ export default function LoginPage() {
           title: "Login realizado com sucesso!",
           description: "Bem-vindo de volta ao SpeechAI.",
         })
+        // Redirect will happen in useEffect based on userRole
+        // For now, we go to /dashboard and let it redirect if needed
         router("/dashboard")
       } else {
         toast({
