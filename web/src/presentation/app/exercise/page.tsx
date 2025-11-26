@@ -491,7 +491,7 @@ export default function ExercisePage() {
     // Simulate word pronunciation
     toast({
       title: "Reproduzindo palavra",
-      description: `Ouça: ${currentWord.word}`,
+      description: `Ouça: ${currentWord?.word || ''}`,
     })
   }
 
