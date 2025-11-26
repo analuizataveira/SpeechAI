@@ -1,4 +1,5 @@
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import { LOCAL_STORAGE_KEYS } from '../../../domain/constants/local-storage';
 
 export const httpClient: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_PUBLIC_API_URL || 'http://localhost:3000',
@@ -7,3 +8,21 @@ export const httpClient: AxiosInstance = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+// Configure request interceptor once, outside of BaseRepository
+// This ensures the token is added to all requests
+httpClient.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    const token = localStorage.getItem(LOCAL_STORAGE_KEYS.accessToken);
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+      console.log('[httpClient] Authorization header set');
+    } else {
+      console.warn('[httpClient] No token found in localStorage');
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);

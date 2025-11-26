@@ -4,6 +4,9 @@ import { LOCAL_STORAGE_KEYS, LocalStorageKey } from '../../../domain/constants/l
 import { IResponseError } from '../../../domain/types/http'
 import { exceptions } from '../../../domain/constants/exceptions'
 
+// Flag to ensure response interceptor is only added once
+let responseInterceptorAdded = false;
+
 export class BaseRepository {
   path: string
   protected httpClient: AxiosInstance
@@ -12,22 +15,13 @@ export class BaseRepository {
     this.path = path
     this.httpClient = httpClient;
 
-    httpClient.interceptors.request.use(
-      config => {
-        const token = this.loadFromLocalStorage<string>(
-          LOCAL_STORAGE_KEYS.accessToken,
-        )
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`
-        }
-        return config
-      },
-      error => {
-        return Promise.reject(error)
-      },
-    )
+    // Request interceptor is now configured in httpClient.ts
+    // to avoid adding it multiple times
 
-    httpClient.interceptors.response.use(
+    // Response interceptor - check if already configured to avoid duplicates
+    if (!responseInterceptorAdded) {
+      responseInterceptorAdded = true;
+      httpClient.interceptors.response.use(
       response => ({
         success: true,
         data: {
@@ -108,7 +102,8 @@ export class BaseRepository {
           friendlyMessage: error.response.data.friendlyMessage,
         }
       },
-    )
+      )
+    }
   }
 
   healthCheck() {

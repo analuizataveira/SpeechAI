@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useState, useEffect } from "react"
 import { useSessions } from "@/hooks/use-sessions"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/presentation/components/ui/card"
 import { Progress } from "@/presentation/components/ui/progress"
@@ -7,10 +7,18 @@ import { Button } from "@/presentation/components"
 import { Badge } from "@/presentation/components/ui/badge"
 import { useNavigate } from "react-router-dom"
 import { useMemo } from "react"
+import { ReportsRepository } from "@/data/repositories/reports/repository"
+import { useToast } from "@/hooks/use-toast"
+import { useUser } from "@/hooks/user-provider"
 
 export default function ReportsPage() {
   const navigate = useNavigate()
   const { sessions, loading } = useSessions()
+  const { toast } = useToast()
+  const { user } = useUser()
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [reportData, setReportData] = useState<any>(null)
+  const reportsRepository = new ReportsRepository()
 
   const stats = useMemo(() => {
     if (!Array.isArray(sessions)) {
@@ -56,6 +64,80 @@ export default function ReportsPage() {
       .slice(0, 10);
   }, [sessions]);
 
+  useEffect(() => {
+    const loadReportData = async () => {
+      try {
+        const response = await reportsRepository.getPatientReport('me')
+        if (response.success && response.data) {
+          setReportData(response.data)
+        }
+      } catch (error) {
+        // Silently fail - report data is optional
+        console.error('Failed to load report data:', error)
+      }
+    }
+    loadReportData()
+  }, [])
+
+  const handleDownloadReport = async () => {
+    setIsDownloading(true)
+    try {
+      const blob = await reportsRepository.downloadPatientReportPdf('me')
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `relatorio-${user?.name || 'paciente'}-${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast({
+        title: "Relatório baixado!",
+        description: "O PDF foi baixado com sucesso.",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Erro ao baixar relatório",
+        description: error?.message || "Não foi possível baixar o relatório.",
+        variant: "error",
+      })
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
+  const handleGenerateReport = async (type: 'weekly' | 'progress' | 'custom') => {
+    setIsDownloading(true)
+    try {
+      const blob = await reportsRepository.downloadPatientReportPdf('me')
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const typeNames = {
+        weekly: 'semanal',
+        progress: 'progresso',
+        custom: 'personalizado'
+      }
+      a.download = `relatorio-${typeNames[type]}-${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast({
+        title: "Relatório gerado!",
+        description: `Relatório ${typeNames[type]} baixado com sucesso.`,
+      })
+    } catch (error: any) {
+      toast({
+        title: "Erro ao gerar relatório",
+        description: error?.message || "Não foi possível gerar o relatório.",
+        variant: "error",
+      })
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -83,9 +165,18 @@ export default function ReportsPage() {
                 <Filter className="w-4 h-4 mr-2" />
                 Filtrar
               </Button>
-              <Button size="sm">
-                <Download className="w-4 h-4 mr-2" />
-                Exportar Tudo
+              <Button size="sm" onClick={handleDownloadReport} disabled={isDownloading}>
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Exportar Tudo
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -187,9 +278,20 @@ export default function ReportsPage() {
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
-                          <Download className="w-4 h-4 mr-2" />
-                          Baixar
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={handleDownloadReport}
+                          disabled={isDownloading}
+                        >
+                          {isDownloading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4 mr-2" />
+                              Baixar
+                            </>
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -208,16 +310,43 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-3 gap-4">
-              <Button variant="outline" className="h-20 flex-col bg-transparent">
-                <Calendar className="w-6 h-6 mb-2" />
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col bg-transparent"
+                onClick={() => handleGenerateReport('weekly')}
+                disabled={isDownloading}
+              >
+                {isDownloading ? (
+                  <Loader2 className="w-6 h-6 mb-2 animate-spin" />
+                ) : (
+                  <Calendar className="w-6 h-6 mb-2" />
+                )}
                 <span>Relatório Semanal</span>
               </Button>
-              <Button variant="outline" className="h-20 flex-col bg-transparent">
-                <TrendingUp className="w-6 h-6 mb-2" />
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col bg-transparent"
+                onClick={() => handleGenerateReport('progress')}
+                disabled={isDownloading}
+              >
+                {isDownloading ? (
+                  <Loader2 className="w-6 h-6 mb-2 animate-spin" />
+                ) : (
+                  <TrendingUp className="w-6 h-6 mb-2" />
+                )}
                 <span>Análise de Progresso</span>
               </Button>
-              <Button variant="outline" className="h-20 flex-col bg-transparent">
-                <FileText className="w-6 h-6 mb-2" />
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col bg-transparent"
+                onClick={() => handleGenerateReport('custom')}
+                disabled={isDownloading}
+              >
+                {isDownloading ? (
+                  <Loader2 className="w-6 h-6 mb-2 animate-spin" />
+                ) : (
+                  <FileText className="w-6 h-6 mb-2" />
+                )}
                 <span>Relatório Personalizado</span>
               </Button>
             </div>

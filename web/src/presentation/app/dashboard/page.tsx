@@ -10,9 +10,18 @@ import LogoutIcon from "@/presentation/components/icons/logout-icon"
 import Settings from "@/presentation/components/icons/settings"
 import { Badge } from "@/presentation/components/ui/badge"
 import { Progress } from "@/presentation/components/ui/progress"
-import { Award, Brain, FileText, Mic, Play, TrendingUp, Loader2 } from "lucide-react"
-import { useEffect, useMemo } from "react"
+import { Award, Brain, FileText, Mic, Play, TrendingUp, Loader2, Sparkles } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { AiExercisesRepository } from "@/data/repositories/ai-exercises/repository"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/presentation/components/ui/dialog"
 
 
 export default function DashboardPage() {
@@ -21,6 +30,10 @@ export default function DashboardPage() {
   const router = useNavigate()
   const { sessions, loading: sessionsLoading } = useSessions()
   const { exerciseLists, loading: listsLoading } = useExerciseLists()
+  const [isGeneratingAiExercises, setIsGeneratingAiExercises] = useState(false)
+  const [aiExercisesDialogOpen, setAiExercisesDialogOpen] = useState(false)
+  const [generatedExerciseList, setGeneratedExerciseList] = useState<any>(null)
+  const aiExercisesRepository = new AiExercisesRepository()
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -96,6 +109,39 @@ export default function DashboardPage() {
       description: "Até logo! Volte sempre para continuar seus exercícios.",
     })
     router("/")
+  }
+
+  const handleGenerateAiExercises = async () => {
+    setIsGeneratingAiExercises(true)
+    try {
+      const response = await aiExercisesRepository.generateExercisesAndCreateList()
+      
+      if (response.success && response.data) {
+        setGeneratedExerciseList(response.data)
+        setAiExercisesDialogOpen(true)
+        toast({
+          title: "Exercícios gerados!",
+          description: "Exercícios personalizados criados com sucesso pela IA.",
+        })
+      } else {
+        throw new Error(response.message || "Erro ao gerar exercícios")
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro ao gerar exercícios",
+        description: error?.message || "Não foi possível gerar exercícios personalizados.",
+        variant: "error",
+      })
+    } finally {
+      setIsGeneratingAiExercises(false)
+    }
+  }
+
+  const handleStartAiExerciseSession = () => {
+    if (generatedExerciseList?.id) {
+      router(`/exercise?listId=${generatedExerciseList.id}`)
+      setAiExercisesDialogOpen(false)
+    }
   }
 
 
@@ -241,6 +287,42 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
+            {/* AI Generated Exercises */}
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Sparkles className="w-5 h-5 mr-2 text-primary" />
+                  Exercícios Personalizados por IA
+                </CardTitle>
+                <CardDescription>Gere exercícios personalizados baseados no seu perfil</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="p-4 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    A IA analisará sua idade e dificuldades de fala para criar exercícios personalizados especialmente para você.
+                  </p>
+                  <Button 
+                    size="lg" 
+                    onClick={handleGenerateAiExercises}
+                    disabled={isGeneratingAiExercises}
+                    className="w-full"
+                  >
+                    {isGeneratingAiExercises ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Gerando...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Gerar Exercícios Personalizados
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Progress Chart */}
             <Card className="bg-card border-border">
               <CardHeader>
@@ -363,6 +445,50 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* AI Exercises Dialog */}
+      <Dialog open={aiExercisesDialogOpen} onOpenChange={setAiExercisesDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <Sparkles className="w-5 h-5 mr-2 text-primary" />
+              Exercícios Personalizados Gerados
+            </DialogTitle>
+            <DialogDescription>
+              Exercícios criados especialmente para você pela IA
+            </DialogDescription>
+          </DialogHeader>
+          {generatedExerciseList && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold mb-2">{generatedExerciseList.title}</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {generatedExerciseList.items?.length || 0} exercícios • 
+                  {generatedExerciseList.diffType?.description && ` ${generatedExerciseList.diffType.description}`}
+                </p>
+              </div>
+              <div className="max-h-60 overflow-y-auto border rounded-lg p-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {generatedExerciseList.items?.map((item: any, index: number) => (
+                    <Badge key={item.id || index} variant="outline" className="p-2 text-center">
+                      {item.exercise?.text || item.text}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAiExercisesDialogOpen(false)}>
+              Fechar
+            </Button>
+            <Button onClick={handleStartAiExerciseSession}>
+              <Play className="w-4 h-4 mr-2" />
+              Iniciar Sessão
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
