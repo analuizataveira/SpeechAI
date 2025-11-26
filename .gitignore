@@ -1,5 +1,5 @@
 # Nestjs specific
-/api/dist
+api/dist
 /node_modules
 /build
 /tmp
