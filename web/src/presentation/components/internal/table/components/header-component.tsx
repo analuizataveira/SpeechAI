@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { cn } from '@/utils/cn'
 import ChevronSort from '../../../icons/ChevronSort'
-
+import React from 'react';
 export const HeaderComponent = ({
   title,
   column,

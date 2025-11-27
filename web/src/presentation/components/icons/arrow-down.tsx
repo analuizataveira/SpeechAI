@@ -1,5 +1,6 @@
-  
+import React from 'react';
 import { SVGProps, memo } from 'react';
+
 
 interface SVGRProps {
   title?: string;

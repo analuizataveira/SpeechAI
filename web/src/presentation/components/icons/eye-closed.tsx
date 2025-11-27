@@ -1,4 +1,5 @@
 import { memo, SVGProps } from "react"
+import React from 'react';
 
 function SvgComponent({fill, ...props}: SVGProps<SVGSVGElement>) {
   return (

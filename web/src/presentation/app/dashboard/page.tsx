@@ -1,34 +1,103 @@
 "use client"
 
-import React from "react"
+import { AiExercisesRepository } from "@/data/repositories/ai-exercises/repository"
+import { DoctorPatientsRepository } from "@/data/repositories/doctor-patients/repository"
+import { useExerciseLists } from "@/hooks/use-exercise-lists"
+import { useSessions } from "@/hooks/use-sessions"
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/hooks/user-provider"
-import { useSessions } from "@/hooks/use-sessions"
-import { useExerciseLists } from "@/hooks/use-exercise-lists"
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/presentation/components"
 import LogoutIcon from "@/presentation/components/icons/logout-icon"
 import Settings from "@/presentation/components/icons/settings"
 import { Badge } from "@/presentation/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/presentation/components/ui/dialog"
 import { Progress } from "@/presentation/components/ui/progress"
-import { Award, Brain, FileText, Mic, Play, TrendingUp, Loader2 } from "lucide-react"
-import { useEffect, useMemo } from "react"
+import { Brain, Loader2, Mic, Play, Sparkles, TrendingUp } from "lucide-react"
+import React, { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 
 
 export default function DashboardPage() {
-  const { user, isAuthenticated, logout } = useUser()
+  const { user, isAuthenticated, isLoading, userRole, logout } = useUser()
   const { toast } = useToast()
   const router = useNavigate()
   const { sessions, loading: sessionsLoading } = useSessions()
   const { exerciseLists, loading: listsLoading } = useExerciseLists()
+  const [isGeneratingAiExercises, setIsGeneratingAiExercises] = useState(false)
+  const [aiExercisesDialogOpen, setAiExercisesDialogOpen] = useState(false)
+  const [generatedExerciseList, _] = useState<any>(null)
+  const [patientDoctors, setPatientDoctors] = useState<string[]>([])
+  const aiExercisesRepository = new AiExercisesRepository()
+  const doctorPatientsRepository = new DoctorPatientsRepository()
 
   useEffect(() => {
+    if (isLoading) return
+    
     if (!isAuthenticated) {
       router("/login")
+      return
     }
-  }, [isAuthenticated, router])
+    
+    if (userRole === 'DOCTOR') {
+      router("/dashboard-doctor")
+      return
+    }
 
-  // Calculate statistics from sessions
+    // Fetch patient's doctors if user is a patient
+    if (userRole === 'PATIENT') {
+      const fetchPatientDoctors = async () => {
+        try {
+          const response = await doctorPatientsRepository.getMyDoctors()
+          
+          // BaseRepository wraps response in { success: true, data: {...} }
+          if (response && (response as any).success !== false) {
+            const innerData = (response as any).data || response
+            
+            // Extract doctors array - handle different response formats
+            let doctors: any[] = []
+            
+            // Case 1: It's already an array
+            if (Array.isArray(innerData)) {
+              doctors = innerData
+            }
+            // Case 2: It's an object with numeric keys (BaseRepository format)
+            else if (innerData && typeof innerData === 'object') {
+              // Check if it has numeric keys (array-like object)
+              const keys = Object.keys(innerData).filter(k => k !== 'success')
+              const numericKeys = keys.filter(k => /^\d+$/.test(k))
+              
+              if (numericKeys.length > 0) {
+                // Convert object with numeric keys to array
+                doctors = numericKeys.map(key => innerData[key]).filter(Boolean)
+              } else if (Array.isArray(innerData.data)) {
+                doctors = innerData.data
+              } else {
+                // Try to get values if it's a single object or other structure
+                const values = Object.values(innerData).filter(v => v && typeof v === 'object' && 'id' in v)
+                if (values.length > 0) {
+                  doctors = values as any[]
+                }
+              }
+            }
+            
+            const doctorIds = doctors.map((doctor: any) => doctor.id).filter(Boolean)
+            setPatientDoctors(doctorIds)
+          }
+        } catch (error) {
+          console.error('Error fetching patient doctors:', error)
+        }
+      }
+      fetchPatientDoctors()
+    }
+  }, [isAuthenticated, isLoading, userRole, router])
+
   const stats = useMemo(() => {
     if (!Array.isArray(sessions)) {
       return {
@@ -75,11 +144,20 @@ export default function DashboardPage() {
     };
   }, [sessions]);
 
-  // Get recommended exercise list (first available or most recent)
   const recommendedList = useMemo(() => {
     if (!Array.isArray(exerciseLists) || exerciseLists.length === 0) return null;
-    return exerciseLists[0]; // You can add logic to select based on user profile
-  }, [exerciseLists]);
+    
+    if (patientDoctors.length > 0) {
+      const filteredLists = exerciseLists.filter(list => 
+        list.doctorId && patientDoctors.includes(list.doctorId)
+      );
+      return filteredLists.length > 0 ? filteredLists[0] : null;
+    }
+
+    
+    
+    return exerciseLists[0];
+  }, [exerciseLists, patientDoctors]);
 
   const handleStartExercise = () => {
     if (recommendedList) {
@@ -96,6 +174,73 @@ export default function DashboardPage() {
       description: "Até logo! Volte sempre para continuar seus exercícios.",
     })
     router("/")
+  }
+
+  const handleGenerateAiExercises = async () => {
+    setIsGeneratingAiExercises(true)
+    try {
+      const response = await aiExercisesRepository.generateExercisesAndCreateList()
+      
+      // Handle response structure from BaseRepository interceptor
+      // Following the same pattern as use-exercise-lists.ts
+      if (response && (response as any).success !== false) {
+        const innerData = (response as any).data
+        
+        // Find the exercise list data - it might be nested
+        let exerciseListData: any = null
+        
+        // Case 1: innerData is the exercise list directly (has id and items or title)
+        if (innerData && innerData.id && (innerData.items || innerData.title)) {
+          exerciseListData = innerData
+        }
+        // Case 2: innerData.data contains the exercise list
+        else if (innerData && innerData.data && innerData.data.id) {
+          exerciseListData = innerData.data
+        }
+        // Case 3: response itself has the data
+        else if ((response as any).id && ((response as any).items || (response as any).title)) {
+          exerciseListData = response
+        }
+        
+        if (exerciseListData && exerciseListData.id) {
+          // Clean the data - remove success property if exists
+          const { success, ...cleanData } = exerciseListData as any
+          
+          toast({
+            title: "Exercícios gerados!",
+            description: "Exercícios personalizados criados com sucesso pela IA.",
+          })
+          // Redirect to exercise page with the generated list
+          router(`/exercise?listId=${cleanData.id}`)
+        } else {
+          console.error("Could not extract exercise list data from response:", { 
+            response, 
+            innerData, 
+            exerciseListData 
+          })
+          throw new Error("Resposta inválida da API: estrutura de dados não reconhecida")
+        }
+      } else {
+        const errorMessage = (response as any)?.message || (response as any)?.friendlyMessage || "Erro ao gerar exercícios"
+        throw new Error(errorMessage)
+      }
+    } catch (error: any) {
+      console.error("Error generating AI exercises:", error)
+      toast({
+        title: "Erro ao gerar exercícios",
+        description: error?.message || "Não foi possível gerar exercícios personalizados.",
+        variant: "error",
+      })
+    } finally {
+      setIsGeneratingAiExercises(false)
+    }
+  }
+
+  const handleStartAiExerciseSession = () => {
+    if (generatedExerciseList?.id) {
+      router(`/exercise?listId=${generatedExerciseList.id}`)
+      setAiExercisesDialogOpen(false)
+    }
   }
 
 
@@ -140,8 +285,7 @@ export default function DashboardPage() {
           <p className="text-muted-foreground">Pronto para mais uma sessão de exercícios? Você está indo muito bem!</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Sessões Completas</CardTitle>
@@ -175,17 +319,6 @@ export default function DashboardPage() {
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalWords}</div>
               <p className="text-xs text-muted-foreground">Palavras praticadas</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Conquistas</CardTitle>
-              <Award className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{user.achievements}</div>
-              <p className="text-xs text-muted-foreground">Medalhas desbloqueadas</p>
             </CardContent>
           </Card>
         </div>
@@ -238,6 +371,42 @@ export default function DashboardPage() {
                     </Button>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* AI Generated Exercises */}
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Sparkles className="w-5 h-5 mr-2 text-primary" />
+                  Exercícios Personalizados por IA
+                </CardTitle>
+                <CardDescription>Gere exercícios personalizados baseados no seu perfil</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="p-4 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    A IA analisará sua idade e dificuldades de fala para criar exercícios personalizados especialmente para você.
+                  </p>
+                  <Button 
+                    size="lg" 
+                    onClick={handleGenerateAiExercises}
+                    disabled={isGeneratingAiExercises}
+                    className="w-full"
+                  >
+                    {isGeneratingAiExercises ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Gerando...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Gerar Exercícios Personalizados
+                      </>
+                    )}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -298,22 +467,12 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Quick Actions */}
             <Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle>Ações Rápidas</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start bg-transparent"
-                  onClick={() => router("/reports")}
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Gerar Relatório
-                </Button>
                 <Button
                   variant="outline"
                   className="w-full justify-start bg-transparent"
@@ -333,36 +492,52 @@ export default function DashboardPage() {
                 </Button>
               </CardContent>
             </Card>
-
-            {/* Achievements */}
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle>Conquistas Recentes</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-warning/20 rounded-full flex items-center justify-center">
-                    <Award className="w-4 h-4 text-warning" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Primeira Semana</p>
-                    <p className="text-xs text-muted-foreground">7 dias consecutivos</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-success/20 rounded-full flex items-center justify-center">
-                    <Award className="w-4 h-4 text-success" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Precisão Alta</p>
-                    <p className="text-xs text-muted-foreground">85% de acertos</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
+
+      <Dialog open={aiExercisesDialogOpen} onOpenChange={setAiExercisesDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <Sparkles className="w-5 h-5 mr-2 text-primary" />
+              Exercícios Personalizados Gerados
+            </DialogTitle>
+            <DialogDescription>
+              Exercícios criados especialmente para você pela IA
+            </DialogDescription>
+          </DialogHeader>
+          {generatedExerciseList && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold mb-2">{generatedExerciseList.title}</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {generatedExerciseList.items?.length || 0} exercícios • 
+                  {generatedExerciseList.diffType?.description && ` ${generatedExerciseList.diffType.description}`}
+                </p>
+              </div>
+              <div className="max-h-60 overflow-y-auto border rounded-lg p-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {generatedExerciseList.items?.map((item: any, index: number) => (
+                    <Badge key={item.id || index} variant="outline" className="p-2 text-center">
+                      {item.exercise?.text || item.text}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAiExercisesDialogOpen(false)}>
+              Fechar
+            </Button>
+            <Button onClick={handleStartAiExerciseSession}>
+              <Play className="w-4 h-4 mr-2" />
+              Iniciar Sessão
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

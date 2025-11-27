@@ -1,7 +1,13 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsOptional, IsString, IsEmail, ValidateIf } from 'class-validator';
 
 export class LinkPatientDto {
   @IsString()
-  @IsNotEmpty()
-  patientId: string;
+  @IsOptional()
+  @ValidateIf((o) => !o.patientEmail)
+  patientId?: string;
+
+  @IsEmail()
+  @IsOptional()
+  @ValidateIf((o) => !o.patientId)
+  patientEmail?: string;
 }

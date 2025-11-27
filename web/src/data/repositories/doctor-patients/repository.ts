@@ -12,9 +12,7 @@ export class DoctorPatientsRepository extends BaseRepository {
     super('doctor-patients');
   }
 
-  async linkPatient(
-    data: ILinkPatientRequest,
-  ): Promise<EitherResponse<IDoctorPatientResponse>> {
+  async linkPatient(data: ILinkPatientRequest): Promise<EitherResponse<IDoctorPatientResponse>> {
     const response = await this.httpClient.post<EitherResponse<IDoctorPatientResponse>>(
       `${this.path}/link`,
       data,
@@ -47,4 +45,3 @@ export class DoctorPatientsRepository extends BaseRepository {
     return response.data;
   }
 }
-

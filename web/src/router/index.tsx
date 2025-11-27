@@ -4,7 +4,9 @@ import { AppRoutes } from "./routes";
 import App from "@/presentation/app";
 import HomePage from "@/presentation/app/home/page";
 import DashboardPage from "@/presentation/app/dashboard/page";
+import DashboardDoctorPage from "@/presentation/app/dashboard-doctor/page";
 import ExercisePage from "@/presentation/app/exercise/page";
+import ExerciseListsPage from "@/presentation/app/exercise-lists/page";
 import ResultsPage from "@/presentation/app/results/page";
 import ReportsPage from "@/presentation/app/reports/page";
 import LoginPage from "@/presentation/app/login/page";
@@ -26,8 +28,16 @@ const router = createBrowserRouter([
         element: <DashboardPage />,
       },
       {
+        path: AppRoutes.BASE.DASHBOARD_DOCTOR.key,
+        element: <DashboardDoctorPage />,
+      },
+      {
         path: AppRoutes.BASE.EXERCISE.key,
         element: <ExercisePage />,
+      },
+      {
+        path: AppRoutes.BASE.EXERCISE_LISTS.key,
+        element: <ExerciseListsPage />,
       },
       {
         path: AppRoutes.BASE.RESULTS.key,

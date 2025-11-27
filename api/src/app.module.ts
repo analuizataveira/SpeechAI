@@ -9,6 +9,8 @@ import { ExercisesModule } from './resources/exercises/exercises.module';
 import { ExerciseListsModule } from './resources/exercise-lists/exercise-lists.module';
 import { SessionsModule } from './resources/sessions/sessions.module';
 import { TranscriptionModule } from './resources/transcription/transcription.module';
+import { AiExercisesModule } from './resources/ai-exercises/ai-exercises.module';
+import { ReportsModule } from './resources/reports/reports.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -26,6 +28,8 @@ import configuration from './config/configuration';
     ExerciseListsModule,
     SessionsModule,
     TranscriptionModule,
+    AiExercisesModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}

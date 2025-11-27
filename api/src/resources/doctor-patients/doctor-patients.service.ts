@@ -17,7 +17,8 @@ export class DoctorPatientsService implements IDoctorPatientsService {
     doctorId: string,
     linkPatientDto: LinkPatientDto,
   ): Promise<DoctorPatientResponseDto> {
-    const { patientId } = linkPatientDto;
+    let { patientId } = linkPatientDto;
+    const { patientEmail } = linkPatientDto;
 
     // Verify doctor profile exists
     const doctorProfile = await this.prisma.doctorProfile.findUnique({
@@ -26,6 +27,28 @@ export class DoctorPatientsService implements IDoctorPatientsService {
 
     if (!doctorProfile) {
       throw new NotFoundException('Doctor profile not found');
+    }
+
+    // If patientEmail is provided, find patient by email
+    if (patientEmail && !patientId) {
+      const user = await this.prisma.user.findUnique({
+        where: { email: patientEmail },
+        include: { patientProfile: true },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User with this email not found');
+      }
+
+      if (!user.patientProfile) {
+        throw new NotFoundException('User is not a patient');
+      }
+
+      patientId = user.patientProfile.id;
+    }
+
+    if (!patientId) {
+      throw new NotFoundException('Patient ID or email is required');
     }
 
     // Verify patient profile exists

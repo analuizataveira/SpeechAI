@@ -1,8 +1,8 @@
 import { useSession } from "@/hooks/use-sessions"
 import { Button } from "@/presentation/components"
 import { Badge } from "@/presentation/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/presentation/components/ui/card"
-import { ArrowRight, Download, Home, Loader2, RotateCcw, Trophy } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/presentation/components/ui/card"
+import { Home, Loader2, Trophy } from "lucide-react"
 import React, { useMemo } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 
@@ -17,7 +17,7 @@ export default function ResultsPage() {
     
     const score = session.score || 0;
     const correctItems = session.correctItems || 0;
-    const totalItems = 15; // This should come from exercise list, but we'll use a default for now
+    const totalItems = session.exerciseList?.items?.length || 0;
     
     // Calculate metrics (simulated for now)
     const correct = Math.round((score / 100) * totalItems);
@@ -61,7 +61,6 @@ export default function ResultsPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-success/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <Trophy className="w-8 h-8 text-success" />
@@ -70,14 +69,11 @@ export default function ResultsPage() {
           <p className="text-muted-foreground">Parabéns! Você completou mais uma sessão de exercícios</p>
         </div>
 
-        {/* Main Results Card */}
         <Card className="bg-card border-border mb-8">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Resultados da Sessão</CardTitle>
-            <CardDescription>Exercício de Consoantes • 15 palavras</CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Score Display */}
             <div className="text-center mb-8">
               <div className="text-6xl font-bold text-primary mb-2">{results.score}%</div>
               <p className="text-lg text-muted-foreground">Precisão Geral</p>
@@ -87,8 +83,6 @@ export default function ResultsPage() {
                 </Badge>
               )}
             </div>
-
-            {/* Detailed Metrics */}
             <div className="grid md:grid-cols-3 gap-6 mb-8">
               <div className="text-center p-4 bg-success/5 rounded-lg border border-success/20">
                 <div className="text-2xl font-bold text-success mb-1">{results.correct}</div>
@@ -106,9 +100,6 @@ export default function ResultsPage() {
 
           </CardContent>
         </Card>
-
-
-        {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link to="/dashboard">
             <Button variant="outline" size="lg" className="w-full sm:w-auto bg-transparent">
@@ -116,38 +107,7 @@ export default function ResultsPage() {
               Voltar ao Dashboard
             </Button>
           </Link>
-
-          <Button size="lg" className="w-full sm:w-auto" onClick={() => navigate("/dashboard")}>
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Nova Sessão
-          </Button>
-
-          <Button variant="outline" size="lg" className="w-full sm:w-auto bg-transparent">
-            <Download className="w-4 h-4 mr-2" />
-            Baixar Relatório
-          </Button>
         </div>
-
-        {/* Next Steps */}
-        <Card className="bg-card border-border mt-8">
-          <CardHeader>
-            <CardTitle>Próximos Passos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-              <div>
-                <h4 className="font-medium">Sessão Recomendada</h4>
-                <p className="text-sm text-muted-foreground">
-                  Exercício de Sílabas Complexas • Baseado no seu progresso
-                </p>
-              </div>
-              <Button>
-                Iniciar
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   )

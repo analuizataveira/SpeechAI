@@ -10,7 +10,6 @@ export function useSessions() {
   const sessionsRepository = new SessionsRepository();
 
   const extractArray = (data: any): ISessionResponse[] => {
-    console.log('🔍 extractArray input:', data);
     
     // The BaseRepository interceptor wraps responses in { success: true, data: {...} }
     // When API returns array directly, interceptor creates: { success: true, data: { success: true, 0: {...}, 1: {...}, length: N } }
@@ -23,7 +22,6 @@ export function useSessions() {
     
     // Step 2: If it's already an array, return it
     if (Array.isArray(apiResponse)) {
-      console.log('✅ Found array directly:', apiResponse.length);
       return apiResponse;
     }
     
@@ -38,7 +36,7 @@ export function useSessions() {
         const array: ISessionResponse[] = [];
         const length = apiResponse.length || numericKeys.length;
         
-        console.log(`📊 Found array-like object with ${length} items`);
+        (`📊 Found array-like object with ${length} items`);
         
         for (let i = 0; i < length; i++) {
           if (apiResponse[i] && typeof apiResponse[i] === 'object') {
@@ -50,14 +48,12 @@ export function useSessions() {
         }
         
         if (array.length > 0) {
-          console.log('✅ Extracted array from array-like object:', array.length);
           return array;
         }
       }
       
       // Step 4: Try to find array in nested data property
       if (apiResponse.data && Array.isArray(apiResponse.data)) {
-        console.log('✅ Found array in data property:', apiResponse.data.length);
         return apiResponse.data;
       }
       
@@ -66,7 +62,6 @@ export function useSessions() {
       const values = Object.values(rest);
       for (const value of values) {
         if (Array.isArray(value) && value.length > 0) {
-          console.log('✅ Found array in object values:', value.length);
           return value as ISessionResponse[];
         }
       }
@@ -81,11 +76,9 @@ export function useSessions() {
     setError(null);
     try {
       const response = await sessionsRepository.findMySessions();
-      console.log('🔍 Raw response from findMySessions:', response);
       
       if (response.success) {
         const sessionsArray = extractArray(response);
-        console.log('✅ Extracted sessions array:', sessionsArray.length, 'sessions');
         setSessions(sessionsArray);
       } else {
         console.error('❌ Response not successful:', response);

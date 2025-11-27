@@ -1,5 +1,6 @@
 export interface ILinkPatientRequest {
-  patientId: string;
+  patientId?: string;
+  patientEmail?: string;
 }
 
 export interface IDoctorPatientResponse {

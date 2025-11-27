@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { ExerciseListsRepository } from '@/data/repositories/exercise-lists/repository';
 import { IExerciseListResponse } from '@/data/repositories/exercise-lists/interface';
 
-export function useExerciseLists() {
+export function useExerciseLists(options?: { useMyLists?: boolean }) {
   const [exerciseLists, setExerciseLists] = useState<IExerciseListResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const exerciseListsRepository = new ExerciseListsRepository();
+  const useMyLists = options?.useMyLists ?? false;
 
   const extractArray = (data: any): IExerciseListResponse[] => {
     const apiResponse = (data as any).data || data;
@@ -101,8 +102,12 @@ export function useExerciseLists() {
   };
 
   useEffect(() => {
-    fetchExerciseLists();
-  }, []);
+    if (useMyLists) {
+      fetchMyLists();
+    } else {
+      fetchExerciseLists();
+    }
+  }, [useMyLists]);
 
   return {
     exerciseLists,
@@ -136,23 +141,41 @@ export function useExerciseList(exerciseListId: string | null) {
         
         // BaseRepository wraps response in { success: true, data: {...} }
         // The actual API response is in response.data
-        const apiResponse = (response as any).data || response;
-        
-        if (apiResponse && (apiResponse.success !== false)) {
-          // Extract the actual exercise list data
-          // It could be directly in apiResponse or in apiResponse.data
-          const exerciseListData = apiResponse.data || apiResponse;
+        if (response && (response as any).success !== false) {
+          const innerData = (response as any).data;
           
-          // Remove success property if it exists
-          const { success, ...cleanData } = exerciseListData;
+          // Find the exercise list data - it might be nested
+          let exerciseListData: IExerciseListResponse | null = null;
           
-          setExerciseList(cleanData as IExerciseListResponse);
+          // Case 1: innerData is the exercise list directly (has id and items)
+          if (innerData && innerData.id && (innerData.items || innerData.title)) {
+            exerciseListData = innerData;
+          }
+          // Case 2: innerData.data contains the exercise list
+          else if (innerData && innerData.data && innerData.data.id) {
+            exerciseListData = innerData.data;
+          }
+          // Case 3: response itself has the data
+          else if ((response as any).id && ((response as any).items || (response as any).title)) {
+            exerciseListData = response as any;
+          }
+          
+          if (exerciseListData) {
+            // Clean the data - remove success property if exists
+            const { success, ...cleanData } = exerciseListData as any;
+            setExerciseList(cleanData as IExerciseListResponse);
+          } else {
+            console.error('Could not extract exercise list data from response');
+            setError('Erro ao processar lista de exercícios');
+            setExerciseList(null);
+          }
         } else {
-          const errorMessage = apiResponse?.message || 'Erro ao carregar lista de exercícios';
+          const errorMessage = (response as any)?.message || 'Erro ao carregar lista de exercícios';
           setError(errorMessage);
           setExerciseList(null);
         }
       } catch (err: any) {
+        console.error('Error fetching exercise list:', err);
         const errorMessage = err?.response?.data?.message || err?.message || 'Erro ao carregar lista de exercícios';
         setError(errorMessage);
         setExerciseList(null);

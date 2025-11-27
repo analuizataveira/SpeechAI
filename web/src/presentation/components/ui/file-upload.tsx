@@ -1,4 +1,5 @@
 import { Trash2 as RemoveIcon } from 'lucide-react'
+import React from 'react';
 import {
   Dispatch,
   SetStateAction,

@@ -9,15 +9,17 @@ import React, { useEffect, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 
 export default function HistoryPage() {
-  const { user, isAuthenticated } = useUser()
+  const { user, isAuthenticated, isLoading } = useUser()
   const { sessions, loading, error } = useSessions()
   const router = useNavigate()
 
   useEffect(() => {
+    if (isLoading) return
+    
     if (!isAuthenticated) {
       router("/login")
     }
-  }, [isAuthenticated, router])
+  }, [isAuthenticated, isLoading, router])
 
   const { completedSessions, inProgressSessions } = useMemo(() => {
     

@@ -1,10 +1,10 @@
 "use client"
 
-import React, { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/hooks/user-provider"
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@/presentation/components"
 import { ArrowLeft, Loader2, Mic } from "lucide-react"
+import React, { useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 export default function LoginPage() {
@@ -15,7 +15,6 @@ export default function LoginPage() {
   const router = useNavigate()
   const { toast } = useToast()
 
-    // Funções para navegação
   const goHome = () => router("/");
   const goForgotPassword = () => router("/forgot-password");
   const goRegister = () => router("/register");
@@ -32,6 +31,8 @@ export default function LoginPage() {
           title: "Login realizado com sucesso!",
           description: "Bem-vindo de volta ao SpeechAI.",
         })
+        // Redirect will happen in useEffect based on userRole
+        // For now, we go to /dashboard and let it redirect if needed
         router("/dashboard")
       } else {
         toast({

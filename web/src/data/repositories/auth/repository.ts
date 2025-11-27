@@ -10,32 +10,53 @@ export class AuthRepository extends BaseRepository {
   }
 
   async login(data: ILoginCredentials): Promise<EitherResponse<ILoginResponse>> {
-    const response = await this.httpClient.post<EitherResponse<ILoginResponse>>(
-      `${this.path}/login`,
-      {
-        email: data.email.replace(/[^a-zA-ZÀ-ú0-9@._]/g, ''),
-        password: data.password,
-      },
-    );
+    try {
+      const response = await this.httpClient.post<EitherResponse<ILoginResponse>>(
+        `${this.path}/login`,
+        {
+          email: data.email.replace(/[^a-zA-ZÀ-ú0-9@._]/g, ''),
+          password: data.password,
+        },
+      );
 
-    if (response.data?.success) {
-      const loginData = response.data as ILoginResponse & { success: true };
-      this.saveToLocalStorage(LOCAL_STORAGE_KEYS.accessToken, loginData.access_token);
+      // Handle successful response - BaseRepository interceptor wraps in { success, data }
+      const responseData = response?.data || response;
+      
+      if (responseData?.success !== false) {
+        // Extract the actual login data from nested structure
+        const innerData = (responseData as any)?.data || responseData;
+        
+        // Look for access_token in the response
+        const accessToken = innerData?.access_token || (innerData as any)?.data?.access_token;
+        
+        if (accessToken) {
+          this.saveToLocalStorage(LOCAL_STORAGE_KEYS.accessToken, accessToken);
 
-      useUserStore.setState({
-        accessToken: loginData.access_token,
-      });
+          useUserStore.setState({
+            accessToken: accessToken,
+          });
+        }
+      }
+
+      return responseData;
+    } catch (error: any) {
+      // Handle error response from interceptor
+      console.error('Login error:', error);
+      return { success: false, message: error?.message || 'Login failed' } as any;
     }
-
-    return response.data;
   }
 
   async getMe(): Promise<EitherResponse<IMeResponse>> {
-    const response = await this.httpClient.get<EitherResponse<IMeResponse>>(
-      `${this.path}/me`,
-    );
+    try {
+      const response = await this.httpClient.get<EitherResponse<IMeResponse>>(
+        `${this.path}/me`,
+      );
 
-    return response.data;
+      return response?.data || response;
+    } catch (error: any) {
+      console.error('GetMe error:', error);
+      return { success: false, message: error?.message || 'Failed to get user info' } as any;
+    }
   }
 
   async logout(): Promise<EitherResponse<ILogoutResponse>> {

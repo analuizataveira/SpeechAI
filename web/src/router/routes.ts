@@ -1,32 +1,38 @@
 export const AppRoutes = {
   BASE: {
-    key: "/",
+    key: '/',
     HOME: {
-      key: "/home",
+      key: '/home',
     },
     LOGIN: {
-      key: "/login",
+      key: '/login',
     },
     REGISTER: {
-      key: "/register",
+      key: '/register',
     },
     EXERCISE: {
-      key: "/exercise",
+      key: '/exercise',
     },
     RESULTS: {
-      key: "/results",
+      key: '/results',
     },
     DASHBOARD: {
-      key: "/dashboard",
+      key: '/dashboard',
+    },
+    DASHBOARD_DOCTOR: {
+      key: '/dashboard-doctor',
+    },
+    EXERCISE_LISTS: {
+      key: '/exercise-lists',
     },
     REPORTS: {
-      key: "/reports",
+      key: '/reports',
     },
     SETTINGS: {
-      key: "/settings",
+      key: '/settings',
     },
     HISTORY: {
-      key: "/history",
+      key: '/history',
     },
   },
 } as const;

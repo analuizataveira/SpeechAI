@@ -11,17 +11,19 @@ import React, { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 export default function SettingsPage() {
-  const { user, isAuthenticated, logout } = useUser()
+  const { user, isAuthenticated, isLoading, logout } = useUser()
   const { toast } = useToast()
   const router = useNavigate()
   const [userData, setUserData] = useState<IMeResponse | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (isLoading) return
+    
     if (!isAuthenticated) {
       router("/login")
     }
-  }, [isAuthenticated, router])
+  }, [isAuthenticated, isLoading, router])
 
   useEffect(() => {
     const fetchUserData = async () => {
