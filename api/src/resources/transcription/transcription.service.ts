@@ -43,7 +43,6 @@ export class TranscriptionService implements ITranscriptionService {
 
       // Parse response from n8n
       const responseData: N8nResponseDto = response.data;
-      console.log('📥 Raw response from n8n webhook:', JSON.stringify(responseData, null, 2));
 
       // Handle n8n response format: { output: [{ content: [{ type: "output_text", text: "..." }] }] }
       // The text may contain explanation + JSON, so we need to extract the JSON
@@ -57,7 +56,6 @@ export class TranscriptionService implements ITranscriptionService {
           const contentItem = outputItem.content.find(item => item.type === 'output_text');
           if (contentItem?.text) {
             textContent = contentItem.text;
-            console.log('📝 Found text content from output format:', textContent);
           }
         }
       }
@@ -66,13 +64,11 @@ export class TranscriptionService implements ITranscriptionService {
         const contentItem = responseData.content[0];
         if (contentItem?.text) {
           textContent = contentItem.text;
-          console.log('📝 Found text content from old format:', textContent);
         }
       }
 
       // Extract JSON from text (text may contain explanation + JSON)
       if (textContent) {
-        console.log('🔍 Attempting to parse text content:', textContent);
         
         // Clean the text content - remove any leading/trailing whitespace and newlines
         const cleanedText = textContent.trim();
@@ -80,9 +76,7 @@ export class TranscriptionService implements ITranscriptionService {
         try {
           // First, try to parse the entire text as JSON
           parsedData = JSON.parse(cleanedText) as N8nParsedDataDto;
-          console.log('✅ Successfully parsed entire text as JSON:', parsedData);
         } catch (error) {
-          console.log('⚠️ Failed to parse entire text as JSON, attempting to extract JSON...');
           
           // Use regex to find JSON object that contains "pontuacao"
           const jsonRegex = /\{[^{}]*"pontuacao"[^{}]*\}/gs;
@@ -115,19 +109,15 @@ export class TranscriptionService implements ITranscriptionService {
                 
                 if (jsonEndIndex !== -1) {
                   const possibleJson = cleanedText.substring(startIndex, jsonEndIndex + 1);
-                  console.log('🔧 Testing potential JSON:', possibleJson);
                   
                   try {
                     const testParsed = JSON.parse(possibleJson);
                     // Check if it has the expected structure
                     if (testParsed && (testParsed.pontuacao !== undefined || testParsed.analise !== undefined)) {
                       parsedData = testParsed as N8nParsedDataDto;
-                      console.log('✅ Successfully parsed extracted JSON:', parsedData);
                       break;
                     }
                   } catch (parseError) {
-                    console.log('⚠️ Failed to parse this JSON candidate:', possibleJson);
-                    console.log('⚠️ Parse error:', parseError instanceof Error ? parseError.message : String(parseError));
                     
                     // Try to fix common JSON issues and retry
                     let fixedJson = possibleJson;
@@ -143,17 +133,15 @@ export class TranscriptionService implements ITranscriptionService {
                         if (nextQuoteIndex === -1) {
                           // No closing quote found, add one before the closing brace
                           fixedJson = possibleJson.replace(/([^"]}?)$/, '"$1');
-                          console.log('🔧 Attempted to fix incomplete JSON:', fixedJson);
                           
                           try {
                             const fixedParsed = JSON.parse(fixedJson);
                             if (fixedParsed && (fixedParsed.pontuacao !== undefined || fixedParsed.analise !== undefined)) {
                               parsedData = fixedParsed as N8nParsedDataDto;
-                              console.log('✅ Successfully parsed fixed JSON:', parsedData);
                               break;
                             }
                           } catch (fixError) {
-                            console.log('⚠️ Failed to parse fixed JSON:', fixError instanceof Error ? fixError.message : String(fixError));
+                            console.error('Failed to parse fixed JSON:', fixError);
                           }
                         }
                       }
@@ -168,17 +156,15 @@ export class TranscriptionService implements ITranscriptionService {
             }
           } else {
             // Try to parse the regex match
-            console.log('🔧 Found JSON with regex:', match[0]);
             try {
               parsedData = JSON.parse(match[0]) as N8nParsedDataDto;
-              console.log('✅ Successfully parsed regex-found JSON:', parsedData);
             } catch (parseError) {
               console.error('❌ Error parsing regex-found JSON:', parseError);
             }
           }
           
           if (!parsedData) {
-            console.log('🔧 Attempting manual extraction of values...');
+            ('🔧 Attempting manual extraction of values...');
             
             // Try to extract values manually using regex
             const pontuacaoMatch = cleanedText.match(/"pontuacao"\s*:\s*"([^"]*%)"/i) || 
@@ -193,7 +179,6 @@ export class TranscriptionService implements ITranscriptionService {
                 analise: analiseMatch ? analiseMatch[1] : undefined
               } as N8nParsedDataDto;
               
-              console.log('✅ Successfully extracted values manually:', parsedData);
             } else {
               console.error('❌ Could not extract valid JSON or values from response');
               console.error('📝 Full text content:', cleanedText);
@@ -202,12 +187,11 @@ export class TranscriptionService implements ITranscriptionService {
         }
       } else if (typeof responseData === 'object') {
         // Fallback: try to use responseData directly
-        console.log('🔄 Using responseData directly as fallback');
+        ('🔄 Using responseData directly as fallback');
         parsedData = responseData as N8nParsedDataDto;
       }
 
       if (parsedData) {
-        console.log('🎯 Processing parsed data:', JSON.stringify(parsedData, null, 2));
         
         // Extract pontuacao (score) - handle "pontuacao": "100%" or "pontuacao": "100" or "pontuacao": 100
         let pontuacao = 0;
@@ -216,13 +200,10 @@ export class TranscriptionService implements ITranscriptionService {
             // Remove % sign and parse
             const cleanScore = parsedData.pontuacao.replace('%', '').trim();
             pontuacao = parseFloat(cleanScore) || 0;
-            console.log(`📊 Extracted score from string "${parsedData.pontuacao}": ${pontuacao}`);
           } else {
             pontuacao = parsedData.pontuacao;
-            console.log(`📊 Extracted score from number: ${pontuacao}`);
           }
         } else {
-          console.log('⚠️ No pontuacao found in parsed data');
         }
 
         // Ensure pontuacao is between 0 and 100
@@ -230,14 +211,12 @@ export class TranscriptionService implements ITranscriptionService {
 
         // Extract analise (feedback)
         const analise = parsedData.analise ?? '';
-        console.log(`💬 Extracted feedback: "${analise}"`);
 
         // Extract transcribed text (if available)
         const transcribedText = parsedData.transcribedText 
           ?? parsedData.text 
           ?? parsedData.transcricao
           ?? '';
-        console.log(`📝 Extracted transcribed text: "${transcribedText}"`);
 
         const result = {
           score: Math.round(pontuacao),
@@ -245,7 +224,6 @@ export class TranscriptionService implements ITranscriptionService {
           feedback: analise,
         };
         
-        console.log('✅ Processed transcription result:', JSON.stringify(result, null, 2));
         return result;
       } else {
         console.error('❌ parsedData is null or undefined');

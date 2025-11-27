@@ -34,7 +34,6 @@ export class DoctorPatientsRepository extends BaseRepository {
       `${this.path}/my-patients`,
     );
 
-    console.log('My patients response:', response.data);
     return response.data;
   }
 

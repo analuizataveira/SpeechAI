@@ -1,6 +1,7 @@
 import { CellContext, ColumnDef, Row } from '@tanstack/react-table'
 import { CellComponent } from '../components/cell-component'
 import { HeaderComponent } from '../components/header-component'
+import React from 'react';
 
 type SpecialCellType<T> = {
   accessorKey: string

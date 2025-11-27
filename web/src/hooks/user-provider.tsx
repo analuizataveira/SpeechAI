@@ -1,10 +1,11 @@
 "use client"
 
-import React, { createContext, useContext, useState, type ReactNode } from "react"
+import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 import { UsersRepository } from "@/data/repositories/users/repository"
 import { AuthRepository } from "@/data/repositories/auth/repository"
 import { ICreateUserRequest } from "@/data/repositories/users/interface"
 import { IMeResponse } from "@/data/repositories/auth/interface"
+import { LOCAL_STORAGE_KEYS } from "@/domain/constants/local-storage"
 
 interface UserProfile {
   id: string
@@ -22,6 +23,7 @@ interface UserProfile {
 interface UserContextType {
   user: UserProfile | null
   isAuthenticated: boolean
+  isLoading: boolean
   userRole: 'PATIENT' | 'DOCTOR' | 'ADMIN' | null
   login: (email: string, password: string) => Promise<boolean>
   register: (userData: {
@@ -42,7 +44,74 @@ const UserContext = createContext<UserContextType | undefined>(undefined)
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [userRole, setUserRole] = useState<'PATIENT' | 'DOCTOR' | 'ADMIN' | null>(null)
+
+  const loadUserFromToken = useCallback(async () => {
+    try {
+      const token = localStorage.getItem(LOCAL_STORAGE_KEYS.accessToken)
+      if (!token) {
+        setIsLoading(false)
+        return
+      }
+
+      const authRepository = new AuthRepository()
+      const meResponse = await authRepository.getMe()
+
+      if (meResponse && meResponse.success !== false) {
+        // Extract the actual user data from nested structure
+        let userData: IMeResponse | null = null
+        const innerMeData = (meResponse as any).data
+        
+        if (innerMeData && innerMeData.id) {
+          userData = innerMeData as IMeResponse
+        } else if ((meResponse as any).id) {
+          userData = meResponse as unknown as IMeResponse
+        }
+        
+        if (userData) {
+          // Convert backend user to frontend UserProfile
+          const birthDate = userData.patientProfile?.birthDate 
+            ? new Date(userData.patientProfile.birthDate)
+            : userData.doctorProfile?.birthDate
+            ? new Date(userData.doctorProfile.birthDate)
+            : new Date()
+          
+          const age = new Date().getFullYear() - birthDate.getFullYear()
+          const profile = userData.patientProfile || userData.doctorProfile
+
+          const userProfile: UserProfile = {
+            id: userData.id,
+            name: profile?.name || 'Usuário',
+            email: userData.email,
+            age,
+            speechDifficulty: "dislalia", // Default, can be updated later
+            level: "iniciante",
+            sessionsCompleted: 0,
+            averageAccuracy: 0,
+            wordsCompleted: 0,
+            achievements: 0,
+          }
+
+          setUser(userProfile)
+          setIsAuthenticated(true)
+          setUserRole(userData.role as 'PATIENT' | 'DOCTOR' | 'ADMIN')
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user from token:', error)
+      // If token is invalid, clear it
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.accessToken)
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.refreshToken)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  // Check for existing token on mount
+  useEffect(() => {
+    loadUserFromToken()
+  }, [loadUserFromToken])
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
@@ -50,7 +119,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
       
       // Login and get access token
       const loginResponse = await authRepository.login({ email, password });
-      console.log('Login response:', loginResponse);
 
       // Handle nested response from BaseRepository interceptor
       // Response format: { success: true, data: { success: true, access_token: ... } }
@@ -68,7 +136,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
       // Get user profile information
       const meResponse = await authRepository.getMe();
-      console.log('Me response:', meResponse);
 
       // Handle nested response
       if (meResponse && meResponse.success !== false) {
@@ -203,6 +270,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isAuthenticated,
+        isLoading,
         userRole,
         login,
         register,

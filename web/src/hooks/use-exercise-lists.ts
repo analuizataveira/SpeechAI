@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { ExerciseListsRepository } from '@/data/repositories/exercise-lists/repository';
 import { IExerciseListResponse } from '@/data/repositories/exercise-lists/interface';
 
-export function useExerciseLists() {
+export function useExerciseLists(options?: { useMyLists?: boolean }) {
   const [exerciseLists, setExerciseLists] = useState<IExerciseListResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const exerciseListsRepository = new ExerciseListsRepository();
+  const useMyLists = options?.useMyLists ?? false;
 
   const extractArray = (data: any): IExerciseListResponse[] => {
     const apiResponse = (data as any).data || data;
@@ -101,8 +102,12 @@ export function useExerciseLists() {
   };
 
   useEffect(() => {
-    fetchExerciseLists();
-  }, []);
+    if (useMyLists) {
+      fetchMyLists();
+    } else {
+      fetchExerciseLists();
+    }
+  }, [useMyLists]);
 
   return {
     exerciseLists,
@@ -133,13 +138,11 @@ export function useExerciseList(exerciseListId: string | null) {
       setError(null);
       try {
         const response = await exerciseListsRepository.findOne(exerciseListId);
-        console.log('Exercise list raw response:', response);
         
         // BaseRepository wraps response in { success: true, data: {...} }
         // The actual API response is in response.data
         if (response && (response as any).success !== false) {
           const innerData = (response as any).data;
-          console.log('Exercise list inner data:', innerData);
           
           // Find the exercise list data - it might be nested
           let exerciseListData: IExerciseListResponse | null = null;
@@ -160,8 +163,6 @@ export function useExerciseList(exerciseListId: string | null) {
           if (exerciseListData) {
             // Clean the data - remove success property if exists
             const { success, ...cleanData } = exerciseListData as any;
-            console.log('Exercise list clean data:', cleanData);
-            console.log('Exercise list items:', cleanData.items);
             setExerciseList(cleanData as IExerciseListResponse);
           } else {
             console.error('Could not extract exercise list data from response');

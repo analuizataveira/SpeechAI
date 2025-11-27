@@ -65,9 +65,6 @@ export class SessionsController {
       where: { id: req.user.id },
       include: { patientProfile: true },
     });
-    if (!user?.patientProfile) {
-      throw new UnauthorizedException('User is not a patient');
-    }
     return this.sessionsService.findByPatient(user.patientProfile.id);
   }
 

@@ -1,22 +1,17 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { useExerciseLists } from "@/hooks/use-exercise-lists"
+import { IDiffTypeResponse } from "@/data/repositories/diff-types/interface"
+import { DiffTypesRepository } from "@/data/repositories/diff-types/repository"
+import { IExerciseListResponse } from "@/data/repositories/exercise-lists/interface"
+import { ExerciseListsRepository } from "@/data/repositories/exercise-lists/repository"
+import { ExercisesRepository } from "@/data/repositories/exercises/repository"
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/hooks/user-provider"
-import { useExerciseLists } from "@/hooks/use-exercise-lists"
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/presentation/components"
+import LogoutIcon from "@/presentation/components/icons/logout-icon"
+import Settings from "@/presentation/components/icons/settings"
 import { Badge } from "@/presentation/components/ui/badge"
-import { Input } from "@/presentation/components/ui/input"
-import { Label } from "@/presentation/components/ui/label"
-import { Textarea } from "@/presentation/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/presentation/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -26,6 +21,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/presentation/components/ui/dialog"
+import { Input } from "@/presentation/components/ui/input"
+import { Label } from "@/presentation/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/presentation/components/ui/select"
 import {
   Table,
   TableBody,
@@ -35,30 +39,23 @@ import {
   TableRow,
 } from "@/presentation/components/ui/table"
 import {
+  ArrowLeft,
+  Eye,
+  ListChecks,
+  Loader2,
   Mic,
   Plus,
-  Loader2,
-  ListChecks,
-  ArrowLeft,
   Stethoscope,
-  Eye,
-  Sparkles,
-  X,
+  X
 } from "lucide-react"
-import { ExerciseListsRepository } from "@/data/repositories/exercise-lists/repository"
-import { DiffTypesRepository } from "@/data/repositories/diff-types/repository"
-import { ExercisesRepository } from "@/data/repositories/exercises/repository"
-import { AiExercisesRepository } from "@/data/repositories/ai-exercises/repository"
-import { IDiffTypeResponse } from "@/data/repositories/diff-types/interface"
-import { IExerciseListResponse } from "@/data/repositories/exercise-lists/interface"
-import LogoutIcon from "@/presentation/components/icons/logout-icon"
-import Settings from "@/presentation/components/icons/settings"
+import React, { useEffect, useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
 
 export default function ExerciseListsPage() {
-  const { user, isAuthenticated, userRole, logout } = useUser()
+  const { user, isAuthenticated, isLoading, userRole, logout } = useUser()
   const { toast } = useToast()
   const router = useNavigate()
-  const { exerciseLists, loading: listsLoading, refetchMyLists } = useExerciseLists()
+  const { exerciseLists, loading: listsLoading, refetchMyLists } = useExerciseLists({ useMyLists: true })
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [viewDialogOpen, setViewDialogOpen] = useState(false)
@@ -75,27 +72,14 @@ export default function ExerciseListsPage() {
     currentWord: "",
     customDiffType: "", // Para permitir que o usuário digite um novo tipo
   })
-  
-  // Tipos de dificuldade padrão
-  const defaultDiffTypes = [
-    "Rótacismo (dificuldade com R)",
-    "Sigmatismo (dificuldade com S)",
-    "Lambdacismo (dificuldade com L)",
-    "Gamacismo (dificuldade com G)",
-    "Betacismo (dificuldade com B)",
-    "Fonema /F/",
-    "Fonema /V/",
-    "Fonema /CH/",
-    "Fonema /J/",
-    "Fonema /Z/",
-  ]
 
   const exerciseListsRepository = new ExerciseListsRepository()
   const diffTypesRepository = new DiffTypesRepository()
   const exercisesRepository = new ExercisesRepository()
-  const aiExercisesRepository = new AiExercisesRepository()
 
   useEffect(() => {
+    if (isLoading) return
+    
     if (!isAuthenticated) {
       router("/login")
       return
@@ -115,10 +99,6 @@ export default function ExerciseListsPage() {
     setIsLoadingDiffTypes(true)
     try {
       const response = await diffTypesRepository.findAll()
-      console.log("Diff types response:", response)
-      
-      // Handle nested response structure from BaseRepository interceptor
-      // Response format: { success: true, data: { success: true, ...apiData } }
       let data: IDiffTypeResponse[] = []
       
       if (response.success) {
@@ -130,12 +110,10 @@ export default function ExerciseListsPage() {
           if (Array.isArray(innerData.data)) {
             data = innerData.data
           } else {
-            // Try to extract array from object values
             const values = Object.values(innerData).filter(v => typeof v !== 'boolean' && v !== undefined)
             if (values.length > 0 && Array.isArray(values[0])) {
               data = values[0] as IDiffTypeResponse[]
             } else if (values.length > 0 && typeof values[0] === 'object') {
-              // Check if values are DiffType objects
               const potentialDiffTypes = values.filter(v => v && typeof v === 'object' && 'id' in (v as any) && 'description' in (v as any))
               if (potentialDiffTypes.length > 0) {
                 data = potentialDiffTypes as IDiffTypeResponse[]
@@ -251,9 +229,7 @@ export default function ExerciseListsPage() {
           diffTypeId: finalDiffTypeId,
           text: word,
         })
-        if (exerciseResponse.success && exerciseResponse.data) {
-          exerciseIds.push(exerciseResponse.data.id)
-        } else if (exerciseResponse.success && (exerciseResponse as any).id) {
+        if (exerciseResponse.success && (exerciseResponse as any).id) {
           exerciseIds.push((exerciseResponse as any).id)
         }
       }

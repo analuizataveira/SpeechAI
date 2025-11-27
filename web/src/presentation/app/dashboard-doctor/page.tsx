@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { IPatientListResponse } from '@/data/repositories/doctor-patients/interface';
+import { DoctorPatientsRepository } from '@/data/repositories/doctor-patients/repository';
+import { useExerciseLists } from '@/hooks/use-exercise-lists';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/hooks/user-provider';
-import { useExerciseLists } from '@/hooks/use-exercise-lists';
 import {
   Button,
   Card,
@@ -16,8 +16,6 @@ import {
 import LogoutIcon from '@/presentation/components/icons/logout-icon';
 import Settings from '@/presentation/components/icons/settings';
 import { Badge } from '@/presentation/components/ui/badge';
-import { Input } from '@/presentation/components/ui/input';
-import { Label } from '@/presentation/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -27,6 +25,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/presentation/components/ui/dialog';
+import { Input } from '@/presentation/components/ui/input';
+import { Label } from '@/presentation/components/ui/label';
 import {
   Table,
   TableBody,
@@ -36,26 +36,25 @@ import {
   TableRow,
 } from '@/presentation/components/ui/table';
 import {
-  Mic,
-  Users,
-  FileText,
-  Plus,
+  Eye,
+  ListChecks,
   Loader2,
-  UserPlus,
+  Mic,
+  Plus,
+  Stethoscope,
   Trash2,
   TrendingUp,
-  ListChecks,
-  Stethoscope,
-  Eye,
+  UserPlus,
+  Users
 } from 'lucide-react';
-import { DoctorPatientsRepository } from '@/data/repositories/doctor-patients/repository';
-import { IPatientListResponse } from '@/data/repositories/doctor-patients/interface';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function DashboardDoctorPage() {
-  const { user, isAuthenticated, userRole, logout } = useUser();
+  const { user, isAuthenticated, isLoading, userRole, logout } = useUser();
   const { toast } = useToast();
   const router = useNavigate();
-  const { exerciseLists, loading: listsLoading, refetchMyLists } = useExerciseLists();
+  const { exerciseLists, loading: listsLoading, refetchMyLists } = useExerciseLists({ useMyLists: true });
 
   const [patients, setPatients] = useState<IPatientListResponse[]>([]);
   const [patientsLoading, setPatientsLoading] = useState(false);
@@ -67,6 +66,8 @@ export default function DashboardDoctorPage() {
   const doctorPatientsRepository = new DoctorPatientsRepository();
 
   useEffect(() => {
+    if (isLoading) return
+    
     if (!isAuthenticated) {
       router('/login');
       return;
@@ -80,7 +81,7 @@ export default function DashboardDoctorPage() {
 
     fetchPatients();
     refetchMyLists();
-  }, [isAuthenticated, userRole, router]);
+  }, [isAuthenticated, isLoading, userRole, router]);
 
   const extractArray = (data: unknown): IPatientListResponse[] => {
     // Extract inner data from BaseRepository response
@@ -298,7 +299,6 @@ export default function DashboardDoctorPage() {
       </header>
 
       <div className='mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8'>
-        {/* Welcome Section */}
         <div className='mb-8'>
           <h1 className='mb-2 text-3xl font-bold'>Olá, Dr(a). {user.name}! 👋</h1>
           <p className='text-muted-foreground'>
@@ -494,14 +494,6 @@ export default function DashboardDoctorPage() {
                 >
                   <ListChecks className='mr-2 h-4 w-4' />
                   Gerenciar Exercícios
-                </Button>
-                <Button
-                  variant='outline'
-                  className='w-full justify-start bg-transparent'
-                  onClick={() => router('/reports')}
-                >
-                  <FileText className='mr-2 h-4 w-4' />
-                  Ver Relatórios
                 </Button>
                 <Button
                   variant='outline'

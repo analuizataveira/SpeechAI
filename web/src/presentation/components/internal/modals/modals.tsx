@@ -1,6 +1,7 @@
 import { useModalStore } from '@/data/stores/modal.store';
 import { Dialog, DialogContent } from '@/presentation/components/ui/dialog';
 import { cn } from '@/utils/cn';
+import React from 'react';
 
 export interface ModalProps {
   id: string;
