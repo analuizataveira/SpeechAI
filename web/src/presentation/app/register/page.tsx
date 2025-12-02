@@ -117,11 +117,9 @@ export default function RegisterPage() {
         toast({
           title: 'Conta criada com sucesso!',
           description:
-            formData.userType === 'DOCTOR'
-              ? 'Bem-vindo ao SpeechAI. Acesse seu painel de médico!'
-              : 'Bem-vindo ao SpeechAI. Vamos começar seus exercícios!',
+            'Realize o login para darmos inicio.'
         });
-        router(formData.userType === 'DOCTOR' ? '/dashboard-doctor' : '/dashboard');
+        router('/login');
       } else {
         toast({
           title: 'Erro no cadastro',

@@ -145,18 +145,19 @@ export default function DashboardPage() {
   }, [sessions]);
 
   const recommendedList = useMemo(() => {
-    if (!Array.isArray(exerciseLists) || exerciseLists.length === 0) return null;
-    
-    if (patientDoctors.length > 0) {
-      const filteredLists = exerciseLists.filter(list => 
-        list.doctorId && patientDoctors.includes(list.doctorId)
-      );
-      return filteredLists.length > 0 ? filteredLists[0] : null;
+    if (!Array.isArray(exerciseLists) || exerciseLists.length === 0) {
+      return null;
     }
+    if (patientDoctors.length === 0) {
+      return null;
+    }
+    console.log("Patient has doctors, filtering lists...");
+    const filteredLists = exerciseLists.filter(list => {
+      console.log("Checking list:", list.title, "doctorId:", list.doctorId);
+      return list.doctorId && patientDoctors.includes(list.doctorId);
+    });
 
-    
-    
-    return exerciseLists[0];
+    return filteredLists.length > 0 ? filteredLists[0] : null;
   }, [exerciseLists, patientDoctors]);
 
   const handleStartExercise = () => {
@@ -365,17 +366,12 @@ export default function DashboardPage() {
                     <p className="text-sm text-muted-foreground mb-4">
                       Nenhuma lista de exercícios disponível no momento.
                     </p>
-                    <Button size="lg" onClick={handleStartExercise} variant="outline">
-                      <Play className="w-4 h-4 mr-2" />
-                      Ver Exercícios
-                    </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* AI Generated Exercises */}
-            <Card className="bg-card border-border">
+            {patientDoctors.length > 0 && (<Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Sparkles className="w-5 h-5 mr-2 text-primary" />
@@ -408,7 +404,8 @@ export default function DashboardPage() {
                   </Button>
                 </div>
               </CardContent>
-            </Card>
+            </Card>) }    
+            
 
             {/* Progress Chart */}
             <Card className="bg-card border-border">

@@ -3,7 +3,7 @@ import { LOCAL_STORAGE_KEYS } from '../../../domain/constants/local-storage';
 
 export const httpClient: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_PUBLIC_API_URL || 'http://localhost:3000',
-  timeout: 17000,
+  timeout: 37000,
   headers: {
     'Content-Type': 'application/json',
   },
