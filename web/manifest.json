@@ -1,0 +1,52 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "SpeechAI",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "SpeechAI",
+  "start_url": "https://speechai-frontend.onrender.com/",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "https://speechai-frontend.onrender.com/favicon.ico",
+      "type": "image/x-icon",
+      "sizes": "445x445",
+      "isSquare": true,
+      "isPng": false,
+      "isWebp": false,
+      "isJpg": false,
+      "width": 445,
+      "is512x512": false,
+      "is256x256": false,
+      "is192x192": false
+    },
+    {
+      "src": "https://speechai-frontend.onrender.com/favicon.ico",
+      "type": "image/x-icon",
+      "sizes": "445x445",
+      "isSquare": true,
+      "isPng": false,
+      "isWebp": false,
+      "isJpg": false,
+      "width": 445,
+      "is512x512": false,
+      "is256x256": false,
+      "is192x192": false
+    },
+    {
+      "src": "https://speechai-frontend.onrender.com/Icon-512x512.png",
+      "type": "image/x-icon",
+      "sizes": "512x512",
+      "isSquare": true,
+      "isPng": true,
+      "isWebp": false,
+      "isJpg": false,
+      "width": 512,
+      "is512x512": true,
+      "is256x256": false,
+      "is192x192": false
+    }
+  ]
+}
