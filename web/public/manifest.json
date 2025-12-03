@@ -6,11 +6,12 @@
   "orientation": "any",
   "scope": "/",
   "short_name": "SpeechAI",
-  "start_url": "https://speechai-frontend.onrender.com/",
+  "description": "Assistência inteligente à fala",
+  "start_url": "./",
   "theme_color": "#ffffff",
   "icons": [
     {
-      "src": "https://speechai-frontend.onrender.com/favicon.ico",
+      "src": "/favicon.ico",
       "type": "image/x-icon",
       "sizes": "445x445",
       "isSquare": true,
@@ -23,7 +24,7 @@
       "is192x192": false
     },
     {
-      "src": "https://speechai-frontend.onrender.com/favicon.ico",
+      "src": "/favicon.ico",
       "type": "image/x-icon",
       "sizes": "445x445",
       "isSquare": true,
@@ -36,8 +37,8 @@
       "is192x192": false
     },
     {
-      "src": "https://speechai-frontend.onrender.com/Icon-512x512.png",
-      "type": "image/x-icon",
+      "src": "/512x512.png",
+      "type": "image/png",
       "sizes": "512x512",
       "isSquare": true,
       "isPng": true,
